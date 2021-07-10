@@ -1,0 +1,176 @@
+body{
+    margin: 0;
+    padding: 0;
+}
+body *{
+    margin: 0;
+    padding: 0;
+}
+header{
+    box-sizing: border-box;
+    width: 100%;
+    height: 60px;
+    min-width: 1800px;
+    padding: 0 100px;
+    box-shadow: 0 1px 4px gray;
+    overflow: hidden;
+}
+header div{
+    box-sizing: border-box;
+    width: 500px;
+    height: 60px;
+    float: left;
+}
+
+header div.right{
+    float: right;
+}
+header div.right #exit{
+    float: right;
+    width: 60px;
+    height: 60px;
+    line-height: 60px;
+    vertical-align: center;
+    text-align: center;
+    text-decoration: none;
+    color: black;
+}
+main{
+    width: 1800px;
+    height: 1100px;
+    margin: 20px auto;
+}
+
+main div{
+    box-sizing: border-box;
+}
+
+main div.quick-module{
+    width: 1800px;
+    height: 300px;
+    margin: 0 auto;
+}
+
+main .quick-module .quick{
+    height: 300px;
+    float: left;
+    /*background: #99CCCC;*/
+    border: solid 1px;
+}
+main .quick-module .function{
+    width: 1430px;
+}
+main .quick-module .quick.about{
+    width: 350px;
+    float: right;
+    position: relative;
+}
+
+main div.userInfo.photo{
+    float: left;
+    width: 150px;
+    height: 150px;
+    margin: 5px;
+    border-radius: 5px;
+    border: #CCCCCC solid 1px;
+    overflow: hidden;
+}
+main div.userInfo.msg{
+    float: left;
+    width: 175px;
+    height: 35px;
+    line-height: 35px;
+    vertical-align: center;
+    margin-top: 3px;
+}
+main div.userInfo.msg:first-child{
+    margin-top: 5px;
+}
+
+main div.userInfo.abstract{
+    clear: both;
+    width: 350px;
+    height: 100px;
+    padding:0 5px;
+    /*border: solid 1px;*/
+}
+main div.userInfo.edit{
+    width: 350px;
+    height: 40px;
+    line-height: 40px;
+}
+
+main ul.state,main ul.mood{
+    position: relative;
+    list-style: none;
+    float: left;
+    width: 85px;
+    height: 40px;
+    z-index: 999;
+}
+main ul.hidden{
+    display: none;
+}
+main ul.hidden.mood{
+    margin-left: 85px;
+}
+main ul.state img,main ul.mood img{
+    vertical-align: middle;
+}
+main ul.state li,main ul.mood li{
+    cursor: pointer;
+}
+main ul.state.hidden li,main ul.mood.hidden li{
+    height: 40px;
+    background: #F7F7F7;
+    border-bottom: solid 1px #CCCCCC;
+    filter: grayscale(100%);
+}
+main ul.state.hidden li:hover,main ul.mood.hidden li:hover{
+    background: white;
+    box-shadow: -2px -2px 2px darkgray;
+    filter: none;
+}
+
+main ul.state li:last-child,main ul.mood li:last-child{
+    border: none;
+    border-radius: 0 0 5px 5px;
+}
+
+main div.userInfo.edit .editBtu{
+    float: right;
+    margin-right: 10px;
+}
+
+main div.userInfo.abstract p{
+    line-height: 25px;
+}
+
+main div.work-space{
+    width: 1800px;
+    height: 780px;
+    margin:20px auto;
+}
+
+main .work-space .workspace{
+    float: left;
+    height: 780px;
+    margin-left: 20px;
+    border: solid 1px;
+}
+
+main .work-space .addressBook{
+    width: 300px;
+    margin-left: 0;
+}
+main .work-space .content{
+    width: 1110px;
+}
+main .work-space .plugs{
+    width: 350px;
+}
+footer{
+    width: 1800px;
+    height: 60px;
+    margin:20px auto;
+}

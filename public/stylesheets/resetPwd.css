@@ -1,0 +1,167 @@
+body{
+    padding: 0;
+    margin: 0;
+}
+body *{
+    padding: 0;
+    margin: 0;
+}
+body div.content-box{
+    width: 1100px;
+    height: 800px;
+    margin: 50px auto;
+}
+body div.top{
+    width: 1100px;
+    height: 140px;
+    border-bottom: solid 1px gray;
+}
+body div.top h4{
+    height: 40px;
+    text-align: center;
+    font-size: 24px;
+    margin-top: 50px;
+}
+body div.progress{
+    height: 100px;
+    width: 930px;
+    margin: 0 auto;
+    border: none;
+}
+body div.progress>div{
+    float: left;
+    box-sizing: border-box;
+    background: #F7F7F7;
+    border: solid 1px #CCCCCC;
+}
+body div.label{
+    position: relative;
+    width: 30px;
+    height: 30px;
+    border-radius: 15px;
+    text-align: center;
+    line-height: 30px;
+    vertical-align: center;
+    margin-left: -15px;
+    margin-top: 35px;
+    z-index: 0;
+}
+body div.state{
+    position: relative;
+    width: 300px;
+    height: 20px;
+    margin-left: -15px;
+    margin-top: 40px;
+    z-index: -1;
+}
+body div.main{
+    width: 1100px;
+    height: 450px;
+    position: relative;
+    margin: 0 auto;
+    overflow: hidden;
+}
+body form{
+    border: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1100px;
+    height: 1800px;
+    transition-property: top;
+    transition-duration: 1s;
+}
+
+body fieldset{
+    border: none;
+    width: 1100px;
+    height: 450px;
+}
+
+body fieldset div{
+    height: 40px;
+    width: 1100px;
+    margin-top: 30px;
+    position: relative;
+}
+body fieldset label{
+    float: left;
+    width: 150px;
+    height: 40px;
+    margin-left: 250px;
+    line-height: 40px;
+    text-align: right;
+    font-size: 16px;
+}
+body fieldset select{
+    float: left;
+    width: 400px;
+    height: 30px;
+    margin-top: 5px;
+    border-radius: 0;
+    font-size: 16px;
+}
+
+body fieldset input{
+    box-sizing: border-box;
+    float: left;
+    box-sizing: border-box;
+    width: 400px;
+    height: 30px;
+    margin-top: 5px;
+    border-radius: 0;
+    border: solid 1px gray;
+    font-size: 16px;
+}
+body fieldset input:focus{
+    outline: none;
+}
+
+body fieldset input.getCode{
+    margin-left: 400px;
+    border-radius: 5px;
+}
+body fieldset input[type=submit]{
+    margin-left: 400px;
+    height: 40px;
+    border-radius: 5px;
+    font-size: 20px;
+    font-weight: 600;
+}
+body fieldset p{
+    display: block;
+    width: 400px;
+    height: 40px;
+    line-height: 40px;
+    margin: 30px auto;
+    text-align: left;
+    background: url("../images/complete.png") 0 4px no-repeat;
+    padding-left: 32px;
+    vertical-align: center;
+}
+
+body fieldset a{
+    display: block;
+    width: 100px;
+    text-align: center;
+    margin: 20px auto;
+    font-size: 18px;
+}
+
+body fieldset.second .previous,body fieldset.third .previous{
+    width: 190px;
+    /*margin-right: 20px;*/
+}
+body fieldset.second .next,body fieldset.third .next{
+    margin-left: 20px;
+    width: 190px;
+}
+body fieldset input[type='image']{
+    position: absolute;
+    margin: 0;
+    width: 28px;
+    height: 28px;
+    top: 6px;
+    right: 305px;
+    border: none;
+}

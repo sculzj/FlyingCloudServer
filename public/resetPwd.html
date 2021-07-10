@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>密码重置</title>
+    <link rel="icon" href="images/headIcon.png" />
+    <link rel="stylesheet" href="stylesheets/resetPwd.css">
+</head>
+<body>
+<div class="content-box">
+    <div class="top">
+        <h4>找回密码</h4>
+        <div class="top progress" id="progress">
+            <div class="label first">1</div>
+            <div class="first state"></div>
+            <div class="label second">2</div>
+            <div class="second state"></div>
+            <div class="label third">3</div>
+            <div class="third state"></div>
+            <div class="label fourth">ok</div>
+        </div>
+    </div>
+    <div class="main">
+        <form>
+            <fieldset class="set first">
+                <div><label>组织机构代码：</label><input class="code" type="text" /></div>
+                <div><label>注册邮箱：</label><input class="email" type="email" /></div>
+                <div>
+                    <label>密保问题：</label>
+                    <select>
+                        <option>请选择密保问题</option>
+                        <option>贵公司详细注册地址是哪里？</option>
+                        <option>贵公司法人代表是谁？</option>
+                        <option>贵公司股票代码是多少？</option>
+                    </select>
+                </div>
+                <div><label>请输入答案：</label><input class="answer" type="text" /></div>
+                <div><input class="getCode" id="getCode" type="button" value="获取验证码" /></div>
+                <div><input type="submit" value="继&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;续" class="next first" id="next-first"/></div>
+            </fieldset>
+            <fieldset class="set second">
+                <div><label>输入验证码：</label><input type="text" /></div>
+                <div>
+                    <input type="submit" value="上&nbsp;&nbsp;一&nbsp;&nbsp;步" class="previous second" id="previous-second"/>
+                    <input type="submit" value="继&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;续" class="next second" id="next-second"/>
+                </div>
+            </fieldset>
+            <fieldset class="set third">
+                <div><label>输入新密码：</label><input type="password" class="userPwd"/><input type="image" src="images/show.png" class="imgBtu"></div>
+                <div><label>确认新密码：</label><input type="password" class="userPwd"/><input type="image" src="images/show.png" class="imgBtu"></div>
+                <div>
+                    <input type="submit" value="上&nbsp;&nbsp;一&nbsp;&nbsp;步" class="previous third" id="previous-third"/>
+                    <input type="submit" value="继&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;续" class="next third" id="next-third"/>
+                </div>
+            </fieldset>
+            <fieldset class="set fourth">
+                <div>
+                    <p></p>
+                    <a href="index.html" target="_self">立即跳转</a>
+                </div>
+            </fieldset>
+        </form>
+    </div>
+</div>
+</body>
+<script src="javascripts/toolFactory.js"></script>
+<script src="javascripts/resetPwd.js"></script>
+</html>

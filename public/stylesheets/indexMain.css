@@ -1,0 +1,242 @@
+main {
+    width: 1600px;
+    margin: 20px auto 0;
+}
+
+/*所有盒子均采用怪异盒模式*/
+main div{
+    box-sizing: border-box;
+}
+
+main div.title {
+    width: 1600px;
+    height: 150px;
+    line-height: 150px;
+    margin: 0 auto;
+    vertical-align: center;
+    background: url("../images/logoV.png") no-repeat;
+}
+
+main div.title h1 {
+    float: left;
+    text-indent: -9999px;
+}
+
+main div.title h2 {
+    float: right;
+    font-size: 36px;
+}
+
+main div.banner {
+    width: 1600px;
+    height: 600px;
+    margin: 20px auto;
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+main div.imgBox{
+    position: absolute;
+    height: 600px;
+    top: 0;
+    left: 0;
+    transition-property: left;
+    transition-timing-function:ease;
+}
+
+main ul.bannerNav{
+    position: absolute;
+    top: 500px;
+    height: 50px;
+    list-style: none;
+}
+
+main ul.bannerNav li{
+    background:#FF6666;
+    width:20px;
+    height:20px;
+    border-radius:10px;
+    float:left;
+    margin:15px 50px;
+}
+
+main ul.bannerNav li:hover{
+    cursor: pointer;
+}
+
+main div.imgBox img{
+    float: left;
+}
+
+main div.banner form {
+    position: absolute;
+    top: 50px;
+    right: 100px;
+    width: 450px;
+    height: 500px;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 0 3px 2px #FFF0F5;
+}
+
+main div.banner fieldset {
+    width: 370px;
+    height: 400px;
+    margin: 50px auto;
+    border: none;
+}
+
+main div.banner fieldset legend {
+    font-size: 26px;
+    font-weight: 900;
+}
+
+main div.banner fieldset div {
+    width: 370px;
+    height: 40px;
+    margin-top: 50px;
+    position: relative;
+    /*border: solid 1px;*/
+}
+
+main div.banner fieldset input {
+    box-sizing: border-box;
+    width: 370px;
+    height: 40px;
+    line-height: 40px;
+    vertical-align: center;
+    font-size: 18px;
+    border: none;
+    border-bottom: solid 1px;
+    padding-left: 40px;
+}
+main div.banner fieldset input.imgBtu{
+    position: absolute;
+    padding-left: 0;
+    border: none;
+    width: 28px;
+    height: 28px;
+    top: 6px;
+    right: 5px;
+}
+
+main div.banner fieldset input:focus{
+    outline: none;
+}
+
+main div.banner fieldset input.userName {
+    background: url("../images/userIcon1.png") 4px 4px no-repeat;
+}
+
+main div.banner fieldset input.userPwd {
+    background: url("../images/pwdIcon.png") 4px 4px no-repeat;
+}
+
+main div.banner fieldset button.submit {
+    border: none;
+    width: 370px;
+    height: 40px;
+    background: -webkit-gradient(linear, left top, left bottom, from(#FF9966), to(#FF6600));
+    border-radius: 5px;
+    font-size: 20px;
+    font-weight: 900;
+    padding: 0;
+    cursor: pointer;
+}
+
+main div.banner fieldset input.saveState{
+    width: 16px;
+    height: 16px;
+    margin-top: 4px;
+    float: left;
+    margin-left: 40px;
+}
+
+main div.banner fieldset a {
+    display: inline-block;
+    text-decoration: none;
+    color: black;
+    float: right;
+    margin-right: 50px;
+}
+
+main div.lightSpot {
+    width: 1600px;
+    height: 400px;
+    margin: 20px auto;
+    border-radius: 10px;
+    overflow: hidden;
+    perspective: 1000px;
+}
+
+/*亮点介绍区域，采用外层翻转盒子+内部两层盒子重叠的方式，外层盒子翻转180°后，内部底层盒子变成了上层*/
+main div.lightSpot .box {
+    float: left;
+    width: 400px;
+    height: 400px;
+    position: relative;
+    transform-style: preserve-3d;
+    transition:all 1s linear;
+}
+
+main div.lightSpot .box:hover {
+    transform: rotateY(180deg);
+}
+
+main div.lightSpot .back, main div.lightSpot .front {
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    top: 0;
+    left: 0;
+}
+
+main div.lightSpot .back {
+    transform: rotateY(-180deg);
+    padding: 30px;
+}
+
+main div.lightSpot .back p {
+    font-size: 20px;
+    line-height: 40px;
+}
+
+main div.lightSpot .front {
+    text-align: center;
+    vertical-align: center;
+    padding-top: 100px;
+}
+
+main div.lightSpot .front h4 {
+    font-size: 28px;
+    font-weight: 700;
+}
+
+
+main div.lightSpot .one {
+    background: #99CCFF;
+}
+
+main div.lightSpot .two {
+    background: #99CCCC;
+}
+
+main div.lightSpot .three {
+    background: #0099CC;
+}
+
+main div.lightSpot .four {
+    background: #006699;
+}
+
+/*预留产品信息区域*/
+main div.productInfo{
+    width: 1600px;
+    height: 800px;
+    margin: 20px auto;
+    border-radius: 10px;
+    border: solid 1px;
+}
+

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>飞云，一站式办公</title>
+    <link rel="icon" href="images/headIcon.png">
+<link rel="stylesheet" href="stylesheets/commonStyle.css"/>
+<link rel="stylesheet" href="stylesheets/indexMain.css"/>
+</head>
+<body>
+<!--页面顶部导航栏-->
+<nav>
+    <div class="nav">
+        <div class="nav left">
+            <a href="#"><img src="images/userIcon.png"/>登录</a>
+            <a href="#"><img src="images/signIcon.png"/>注册</a>
+        </div>
+        <div class="nav right">
+            <a href="#" id="busSign"><img src="images/userIcon.png"/>企业登录</a>
+            <a href="sign.html" target="_blank"><img src="images/signIcon.png"/>企业注册</a>
+        </div>
+    </div>
+</nav>
+<!--页面主题内容-->
+<main>
+    <!--页面标题与slogan-->
+    <div id="title" class="title">
+        <h1>飞云办公</h1>
+        <h2>飞云办公，工作更轻松！云边协同，企业好帮手！</h2>
+    </div>
+    <!--首页banner位与登录入口-->
+    <div class="banner">
+        <div class="imgBox" id="imgBox">
+            <img src="images/banner1.jpg" />
+            <img src="images/banner2.jpg" />
+            <img src="images/banner3.jpg" />
+            <img src="images/banner1.jpg" />
+        </div>
+        <!--按钮导航-->
+        <ul class="bannerNav" id="bannerNav">
+
+        </ul>
+        <form id="login-form">
+            <fieldset>
+                <legend>用户登录</legend>
+                <div><input class="userName" name="userID" type="text" placeholder="请输入登录账号"/></div>
+                <div>
+                    <input class="userPwd" name="userPwd" type="password" placeholder="请输入登录密码"/>
+                    <input class="imgBtu" type="image" src="images/show.png" />
+                </div>
+                <div><input class="saveState" type="checkbox"  /><label>记住登录状态</label><a class="forget" href="resetPwd.html">忘记密码>></a></div>
+                <div><button class="submit" type="button">登&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;录</button></div>
+            </fieldset>
+        </form>
+    </div>
+    <!--四大优势介绍-->
+    <div class="lightSpot">
+        <div class="box">
+            <div class="one back"><p>集成日常OA、商务邮箱、流程申请、财务报销、会议预定、社交通讯等工具于一体，只需要一个账号即可满足日常办公需求，
+                打破传统办公模式中的信息割裂，大大提升办公体验与工作效率</p>
+            </div>
+            <div class="one front"><img src="images/lightSpot.png"/><h4>一站办公</h4></div>
+        </div>
+        <div class="box">
+            <div class="two back"><p>支持windows、Mac OS、Android等多平台，支持PC端、移动端数据同步共享，所有资料云端备份，随时随地自由办公，
+                工作生活无缝衔接，再也不用担心错过重要信息</p>
+            </div>
+            <div class="two front"><img src="images/lightSpot.png"/><h4>多端协同</h4></div>
+        </div>
+        <div class="box">
+            <div class="three back"><p>采用企业内网+企群公网组网架构，满足企业内部信息安全的同时，不同企业之间通过 本系统，可以实现跨企业信息无
+                损流转与通讯</p>
+            </div>
+            <div class="three front"><img src="images/lightSpot.png"/><h4>千企互联</h4></div>
+        </div>
+        <div class="box">
+            <div class="four back"><p>采用组件式设计，企业可按自身业务需求进行业务组合，灵活适配不同需求，同时开放API接口，支持企业结合自身业务
+                需求进行二次开发，生成个性化应用</p></div>
+            <div class="four front"><img src="images/lightSpot.png"/><h4>灵活开放</h4></div>
+        </div>
+    </div>
+    <!--预留信息区-->
+    <div class="productInfo">
+        产品信息区域
+    </div>
+</main>
+<!--页面底部导航栏-->
+<footer>
+    <ul>
+        <li><a href="#"><img src="images/about.png" />公司介绍</a></li>
+        <li><a href="mailto:sculzj@163.com?subject=关于飞云办公系统的合作意向"><img src="images/cooperation.png" />商务合作</a></li>
+        <li><a href="#"><img src="images/service.png" />在线客服</a></li>
+        <li><a href="#"><img src="images/law.png" />法律声明</a></li>
+        <li><a href="#"><img src="images/contact.png" />联系我们</a></li>
+    </ul>
+</footer>
+</body>
+<script src="../dist/app.js"></script>
+<script src="javascripts/jquery.js"></script>
+<script src="javascripts/toolFactory.js"></script>
+<script src="javascripts/index.js"></script>
+</html>

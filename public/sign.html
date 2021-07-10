@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>新用户注册</title>
+    <link rel="icon" href="images/headIcon.png"/>
+    <link href="stylesheets/sign.css" rel="stylesheet"/>
+    <script src="javascripts/chinaCites.js" defer></script>
+    <script src="javascripts/sign.js" defer></script>
+</head>
+<body>
+<div>
+    <form action="" method="post">
+        <fieldset>
+            <legend>企业注册</legend>
+            <div><label>企业名称：</label><input type="text" size="50"/></div>
+            <div><label>组织机构代码：</label><input type="text" size="50"/></div>
+            <div><label>企业官网：</label><input type="url" size="50"/></div>
+            <div id="divOfLicense">
+                <label>营业执照：</label>
+                <input type="text" contenteditable="false" class="fileInfo" id="licenseInfo"/>
+                <input type="button" value="选择文件" class="chooseFile"/>
+                <input type="file" class="hiddenInput" id="license" accept=".pdf,.png,.jpg"/>
+                <p>*请上传营业执照复印件，仅限pdf或jpg格式</p>
+            </div>
+            <div id="divOfAuth">
+                <label>法人授权书：</label>
+                <input type="text" contenteditable="false" class="fileInfo" id="authorizationInfo"/>
+                <input type="button" value="选择文件" class="chooseFile" />
+                <input type="file" class="hiddenInput" id="authorization" accept=".pdf,.png,.jpg"/>
+                <p>*请上传具有法人签字并加盖公章的授权书彩色扫描件，仅限pdf或jpg格式</p>
+            </div>
+            <div><label>联系地址：</label>
+                <select id="provinceList">
+                    <option value="">----省----</option>
+                </select>
+                <select id="cityList">
+                    <option value="">----市----</option>
+                </select>
+                <input type="text" id="address" placeholder="具体地址" />
+            </div>
+            <div id="divOfEmail">
+                <label>管理邮箱：</label><input type="email" size="50" id="email"/>
+                <p>*管理邮箱将作为官方与您的唯一认证联系渠道，请正确填写并妥善保管邮箱！</p>
+            </div>
+            <div><input type="checkbox"/><a href="agreement.html" target="_blank" id="agreementLink">已阅读并同意服务条款</a></div>
+            <div><input type="submit" value="提&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;交"/></div>
+        </fieldset>
+    </form>
+</div>
+</body>
+</html>

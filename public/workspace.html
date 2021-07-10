@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>我的工作台</title>
+    <link rel="icon" href="images/headIcon.png"/>
+    <link rel="stylesheet" href="stylesheets/workspace.css"/>
+</head>
+<%include(../views/workspacce.art)%>
+<body>
+<header>
+    <div class="top left"><input type="image" src="images/logoH.png"/></div>
+    <div class="top right"><a href="#" id="exit">退&nbsp;&nbsp;出</a></div>
+</header>
+
+<main>
+    <div>
+        <div class="quick-module">
+            <div class="quick function">
+                <ul>
+                    <li>待办事项</li>
+                </ul>
+            </div>
+            <div class="quick about" id="userInfo">
+                <div class="userInfo photo"><img src="images/userPhoto.jpg"/></div>
+                <div class="userInfo msg"><label>姓名：</label><label><%=result.userName%></label></div>
+                <div class="userInfo msg"><label>部门：</label><label><%=result.department%></label></div>
+                <div class="userInfo msg"><label>职位：</label><label><%=result.post%></label></div>
+                <div class="userInfo msg">
+                    <ul class="state view"><li><img src="images/state-free.png"/>空闲~</li></ul>
+                    <ul class="mood view"><li><img src="images/mood-happy.png"/>开心~</li></ul>
+                    <ul class="state hidden">
+                        <li><img src="images/state-free.png"/>空闲~</li>
+                        <li><img src="images/state-busy.png"/>忙碌中</li>
+                        <li><img src="images/state-meeting.png"/>会议中</li>
+                        <li><img src="images/state-trip.png"/>出差中</li>
+                        <li><img src="images/state-holiday.png"/>度假中</li>
+                    </ul>
+                    <ul class="mood hidden">
+                        <li><img src="images/mood-happy.png"/>开心~</li>
+                        <li><img src="images/mood-depressed.png"/>郁闷~</li>
+                        <li><img src="images/mood-selfClosing.png"/>自闭~</li>
+                        <li><img src="images/mood-sad.png"/>伤心~</li>
+                    </ul>
+                </div>
+                <div class="userInfo abstract">
+                    <p>本节将网页设计中常见的色彩搭配按照色相的顺序归类。每类都以该色相为主，配以其他色相或者同色相的，
+                        应用对比和调和的方法，并按照从轻快到浓烈的顺序排序。</p>
+                </div>
+                <div class="userInfo edit">
+                    <input class="editBtu" type="image" src="images/edit.png"/>
+                </div>
+            </div>
+        </div>
+        <div class="work-space">
+            <div class="workspace addressBook">通讯录</div>
+            <div class="workspace content">
+
+            </div>
+            <div class="workspace plugs">
+                <div>
+                    日历
+                </div>
+                <div>
+                    预留空间
+                </div>
+                <div>
+                    预留空间
+                </div>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<footer>
+    <div>预留底部导航栏</div>
+</footer>
+<script src="javascripts/jquery.js"></script>
+<script src="javascripts/workspace.js"></script>
+</body>
+</html>
