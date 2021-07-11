@@ -27,7 +27,10 @@ const {
     verifyIdentity,
     verifySysUser,
     getQuestions,
-    initSysPwd
+    initSysPwd,
+    getApplyOrgs,
+    uploadApplyFile,
+    getOrgInfo
 } = require('./mysqlMiddleWare');
 /**
  * 引入自定义模块
@@ -36,7 +39,6 @@ const logger = require('./log-component').logger;
 const privateKey = fs.readFileSync('../key/private.key');
 const {Status, Code} = require('./constants');
 // const {verifyUserLogin,getProductInfo} = require('./redisMiddleWare');
-
 
 const app = express();
 const BufferQueue = new Map();
@@ -234,7 +236,7 @@ app.post('/verifyIdentity', bodyParser.json(), async (req, res) => {
 
 app.post('/register', bodyParser.json(), async (req, res) => {
     try {
-        console.log(req.body);
+        // console.log(req.body);
         const result = await registerOrg(req.body);
         res.status(Code.success).send({state: Status.success, msg: result});
     } catch (err) {
@@ -249,19 +251,21 @@ app.post('/upload', (req, res) => {
             res.status(Code.error).send({code: Code.error, msg: '服务器接收文件失败！'});
         } else {
             let i = 0;
+            const data = {};
             for (let prop in files) {
                 const readStream = fs.createReadStream(`${files[prop].path}`);
-                const writeStream = fs.createWriteStream(`D:\\WebStorm Project\\flowingcloud\\src\\resource\\userResource\\${files[prop].name}`);
+                const writeStream = fs.createWriteStream(`D:\\Develop Project\\flowingcloud\\src\\resource\\userResource\\${files[prop].name}`);
                 readStream.pipe(writeStream);
                 readStream.on('end', () => {
-                    // console.log(`${files[prop].name}写入完毕！`)
+                    // console.log(`${files[prop].name}写入完毕！`);
                     i += 1;
+                    data[prop] = `resource/userResource/${files[prop].name}`;
                     if (i === 2) {
-                        const identity = files[prop].name.split('_')[0];
-                        initOrgResource(identity).then(() => {
-                            res.status(Code.success).send({code: Code.success, msg: '企业注册成功,资源初始化完成，请等待管理员审核！'});
-                        }).catch(err => {
-                            res.status(Code.error).send({code: Code.error, msg: '企业注册成功,但资源初始化失败，请联系管理员审核并处理！'});
+                        data.identity = files[prop].name.split('_')[0];
+                        uploadApplyFile(data).then(() => {
+                            res.status(Code.success).send({code: Code.success, msg: '企业注册成功,请等待管理员审核！'});
+                        }).catch(() => {
+                            res.status(Code.error).send({code: Code.error, msg: '企业注册失败,请联系管理处理或从新注册！'});
                         });
                     }
                 })
@@ -321,12 +325,11 @@ app.delete('/deleteGroup', bodyParser.json(), async (req, res) => {
         if (err) {
             res.status(Code.refused).send({code: Code.refused, msg: '登录信息已过期，请重新登录！'});
         } else {
-            try {
-                const result = await deleteGroup(decoded.data, req.body.groupCode);
+            deleteGroup(decoded.data, req.body.groupCode).then(() => {
                 res.status(Code.success).send({code: Code.success, msg: '组织删除成功！'});
-            } catch (e) {
+            }).catch((e) => {
                 res.status(Code.error).send({code: Code.error, msg: e.message});
-            }
+            });
         }
     })
 });
@@ -350,7 +353,7 @@ app.put('/orderOrgGroup', bodyParser.json(), (req, res) => {
 
 app.post('/batchAddMembers', (req, res) => {
     const token = req.headers.authorization;
-    jwt.verify(token, privateKey, (err, decode) => {
+    jwt.verify(token, privateKey, (err) => {
         if (err) {
             res.status(Code.refused).send({code: Code.refused, msg: '登录信息已过期，请重新登录！'});
         } else {
@@ -379,39 +382,73 @@ app.post('/system', bodyParser.json(), (req, res) => {
                 algorithm: 'RS256',
                 data: result.uid,
                 exp: Math.floor(Date.now() / 1000) + (60 * 60) * 12
-            },privateKey,(err,token)=>{
-                if (err){
-                    res.status(Code.success).send({code:Code.error,msg:'token令牌生成失败！'});
-                }else {
-                    const userinfo= {uid:result[0].uid,init:result[0].init};
-                    res.status(Code.success).send({code:Code.success,userObj:userinfo,token:token});
+            }, privateKey, (err, token) => {
+                if (err) {
+                    res.status(Code.success).send({code: Code.error, msg: 'token令牌生成失败！'});
+                } else {
+                    const userinfo = {uid: result[0].uid, init: result[0].init};
+                    res.status(Code.success).send({code: Code.success, userObj: userinfo, token: token});
                 }
             });
         }
-    }).catch(err => {
+    }).catch(() => {
         // console.log(err)
         res.status(Code.error).send({code: Code.error, msg: '数据库异常，请联系管理员处理。'});
     });
 });
 
-app.get('/questions',(_, res) => {
+app.get('/questions', (_, res) => {
     // console.log('获取到请求');
-    getQuestions().then(result=>{
+    getQuestions().then(result => {
         res.status(Code.success).send(result);
     }).catch(() => {
-        res.status(Code.error).send({code:Code.error,msg:'数据库查询失败！'});
+        res.status(Code.error).send({code: Code.error, msg: '数据库查询失败！'});
     });
 });
 
-app.post('/initSysPwd',bodyParser.json(),(req, res) => {
+app.post('/initSysPwd', bodyParser.json(), (req, res) => {
     // console.log(req.body);
-    const {uid,pwd,question1,answer1,question2,answer2,question3,answer3}=req.body;
-    const newPwd=MD5(pwd);
-    const data=[newPwd,question1,answer1,question2,answer2,question3,answer3,1,uid];
-    initSysPwd(data).then(()=>{
-        res.status(Code.success).send({code:Code.success,msg:'密码修改成功！'});
-    }).catch((e)=>{
+    const {uid, pwd, question1, answer1, question2, answer2, question3, answer3} = req.body;
+    const newPwd = MD5(pwd);
+    const data = [newPwd, question1, answer1, question2, answer2, question3, answer3, 1, uid];
+    initSysPwd(data).then(() => {
+        res.status(Code.success).send({code: Code.success, msg: '密码修改成功！'});
+    }).catch((e) => {
         console.log(e);
-        res.status(Code.error).send({code:Code.error,msg:'密码修改失败！'});
+        res.status(Code.error).send({code: Code.error, msg: '密码修改失败！'});
     })
+});
+
+app.post('/applyOrgs', (req, res) => {
+    // console.log('接收到请求')
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: 'token令牌失效，请重新登录！'});
+        } else {
+            getApplyOrgs().then(result => {
+                res.status(Code.success).send({code: Code.success, result});
+            }).catch(reason => {
+                // console.log(reason)
+                res.status(Code.error).send({code: Code.error, msg: '数据库错误！'})
+            });
+        }
+    });
+});
+
+app.post('/approveInfo', bodyParser.json(), (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, err => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: 'token令牌失效，请重新登录！'});
+        } else {
+            const {key}=req.body;
+            // console.log(key);
+            getOrgInfo(key).then(result=>{
+                res.status(Code.success).send({code:Code.success,result:result[0]});
+            }).catch(err=>{
+                res.status(Code.error).send({code:Code.error,msg:'数据库查询失败！'});
+            });
+        }
+    });
 });

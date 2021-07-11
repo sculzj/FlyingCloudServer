@@ -5,12 +5,14 @@ const mysql = require('mysql');
 const MD5 = require("MD5");
 const {Code} = require("./constants");
 const {Status} = require("./constants");
+const moment = require('moment');
 
 /**
  * 引入自定义日志模块
  * @type {Logger}
  */
 const logger = require('./log-component').logger;
+// moment().format();
 
 /**
  * 声明存储数据库连接的Map
@@ -24,14 +26,16 @@ const conMap = new Map();
  */
 
 const baseParams = {
-    host: 'localhost',
+    host: '192.168.101.4',
     port: '3306',
     user: 'root',
-    password: '17xy8qzb'
+    password: '17xy8qzb',
+    timezone:'+8:00'
 };
 
 const defaultConnection = mysql.createConnection(baseParams, (err) => {
     if (err) {
+        console.log(err);
         logger.error(err);
     } else {
         logger.info('数据库登录成功！');
@@ -40,6 +44,7 @@ const defaultConnection = mysql.createConnection(baseParams, (err) => {
 
 defaultConnection.connect(err => {
     if (err) {
+        console.log(err);
         logger.error('数据库连接失败！');
         return;
     }
@@ -83,9 +88,9 @@ defaultConnection.connect(err => {
     });
 });
 
-const verifyUserSql = 'select * from users where userId=? and pwd=?';
+// const verifyUserSql = 'select * from users where userId=? and pwd=?';
 const verifyOrgSql = 'select * from orgs where email=? and pwd=?';
-const queryUserInfoSql = 'select * from userinfo where userId=?';
+// const queryUserInfoSql = 'select * from userinfo where userId=?';
 const queryProductInfoSql = 'select * from product_info';
 const queryRank = 'select * from topic order by discuss DESC limit 10';
 const queryOrgSql = 'select * from orgs where code=?';
@@ -184,6 +189,7 @@ function verifyOrgEmail(email) {
 
 function registerOrg(org) {
     org.pwd = MD5(org.pwd);
+    org.apply_time =moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
     return new Promise((resolve, reject) => {
         setTimeout(reject, 15000, Status.error);
         conMap.get('base').query(createOrgSql, [org], (err) => {
@@ -580,11 +586,11 @@ function verifySysUser(uid, pwd) {
 }
 
 function getQuestions() {
-    return new Promise((resolve,reject)=>{
+    return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
             reject('数据库连接超时！')
         }, 15000);
-        conMap.get('base').query('select question from security_questions',(err, result) => {
+        conMap.get('base').query('select question from security_questions', (err, result) => {
             clearTimeout(timer);
             if (err) {
                 reject('数据库查询失败！');
@@ -596,12 +602,12 @@ function getQuestions() {
 }
 
 function initSysPwd(data) {
-    return new Promise((resolve,reject)=>{
-        const timer=setTimeout(reject,15000,'数据库连接超时！');
-        conMap.get('base').query('update sys_users set pwd=?,question1=?,answer1=?,question2=?,answer2=?,question3=?,answer3=?,init=? where uid=?',data,(err)=>{
-            if (err){
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(reject, 15000, '数据库连接超时！');
+        conMap.get('base').query('update sys_users set pwd=?,question1=?,answer1=?,question2=?,answer2=?,question3=?,answer3=?,init=? where uid=?', data, (err) => {
+            if (err) {
                 reject('数据库更新失败！');
-            }else {
+            } else {
                 clearTimeout(timer);
                 resolve('密码更新成功！');
             }
@@ -609,21 +615,76 @@ function initSysPwd(data) {
     });
 }
 
-exports.verifyUser = verifyUser;
-exports.getUserInfo = getUserInfo;
-exports.getProductInfo = getProductInfo;
-exports.getRank = getRank;
-exports.verifyOrgCode = verifyOrgCode;
-exports.registerOrg = registerOrg;
-exports.verifyOrgEmail = verifyOrgEmail;
-exports.verifyOrg = verifyOrg;
-exports.getOrgGroup = getOrgGroup;
-exports.updateOrgGroup = updateOrgGroup;
-exports.insertGroupInfo = insertGroupInfo;
-exports.deleteGroup = deleteGroup;
-exports.updateRankIndex = updateRankIndex;
-exports.initOrgResource = initOrgResource;
-exports.verifyIdentity = verifyIdentity;
-exports.verifySysUser=verifySysUser;
-exports.getQuestions=getQuestions;
-exports.initSysPwd=initSysPwd;
+function getApplyOrgs() {
+    return new Promise((resolve,reject)=>{
+        const timerId=setTimeout(reject,15000,'数据库查询失败！');
+        conMap.get('base').query('select name,identity,apply_time from orgs where state= ?',[-1],(err,result)=>{
+            if (err){
+                reject('数据库查询失败！');
+            }else {
+                resolve(result);
+            }
+            clearTimeout(timerId);
+        });
+    });
+}
+
+function getApplyInfo(identity) {
+    return new Promise((resolve,reject)=>{
+        const timerId=setTimeout(reject,15000,'数据库查询失败！');
+        conMap.get('base').query('select code,name,site,address,identity');
+    });
+}
+
+function uploadApplyFile(data) {
+    return new Promise((resolve,reject)=>{
+        const timerId=setTimeout(reject,15000,'数据库更新失败！');
+        conMap.get('base').query('update orgs set license=?,letter=? where identity=?',[data.license,data.letter,data.identity],(err)=>{
+            if (err){
+                reject('文件上传失败！');
+            }else {
+                resolve('文件上传成功！');
+            }
+            clearTimeout(timerId);
+        });
+    });
+}
+
+function getOrgInfo(identity) {
+    return new Promise((resolve,reject)=>{
+        const timerId=setTimeout(reject,15000,'数据库更新失败！');
+        conMap.get('base').query('select code,name,site,address,identity,apply_time,license,letter from orgs where identity=?',[identity],(err,result)=>{
+            if (err||result.length===0){
+                reject('数据库查询失败！');
+            }else {
+                resolve(result);
+            }
+            clearTimeout(timerId);
+        });
+    });
+}
+
+module.exports = {
+    verifyUser,
+    getUserInfo,
+    getProductInfo,
+    getRank,
+    verifyOrgCode,
+    registerOrg,
+    verifyOrgEmail,
+    verifyOrg,
+    getOrgGroup,
+    updateOrgGroup,
+    insertGroupInfo,
+    deleteGroup,
+    updateRankIndex,
+    initOrgResource,
+    verifyIdentity,
+    verifySysUser,
+    getQuestions,
+    initSysPwd,
+    getApplyOrgs,
+    uploadApplyFile,
+    getApplyInfo,
+    getOrgInfo
+};
