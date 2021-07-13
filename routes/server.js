@@ -9,6 +9,7 @@ const {nanoid} = require('nanoid');
 const MD5 = require('MD5');
 const formidable = require('formidable');
 const Excel = require('exceljs');
+const {emailTo} = require("./mailServer");
 const {
     verifyUser,
     getProductInfo,
@@ -19,7 +20,7 @@ const {
     verifyOrgEmail,
     verifyOrg,
     updateOrgGroup,
-    getOrgGroup,
+    getOrganizations,
     insertGroupInfo,
     deleteGroup,
     updateRankIndex,
@@ -30,7 +31,8 @@ const {
     initSysPwd,
     getApplyOrgs,
     uploadApplyFile,
-    getOrgInfo
+    getApplyInfo,
+    approveOrg
 } = require('./mysqlMiddleWare');
 /**
  * 引入自定义模块
@@ -225,6 +227,9 @@ app.post('/verifyOrgEmail', bodyParser.json(), async (req, res) => {
     }
 });
 
+/**
+ * 实时验证识别码的请求接口
+ */
 app.post('/verifyIdentity', bodyParser.json(), async (req, res) => {
     try {
         await verifyIdentity(req.body.identity);
@@ -281,7 +286,7 @@ app.post('/orgGroup', (req, res) => {
         if (err) {
             res.status(Code.refused).send({code: Code.refused, msg: '登录信息已过期，请重新登录！'});
         } else {
-            const result = await getOrgGroup(decoded.data);
+            const result = await getOrganizations(decoded.data);
             res.status(Code.success).send({code: Code.success, groups: result});
         }
     })
@@ -442,13 +447,49 @@ app.post('/approveInfo', bodyParser.json(), (req, res) => {
         if (err) {
             res.status(Code.refused).send({code: Code.refused, msg: 'token令牌失效，请重新登录！'});
         } else {
-            const {key}=req.body;
+            const {key} = req.body;
             // console.log(key);
-            getOrgInfo(key).then(result=>{
-                res.status(Code.success).send({code:Code.success,result:result[0]});
-            }).catch(err=>{
-                res.status(Code.error).send({code:Code.error,msg:'数据库查询失败！'});
+            getApplyInfo(key).then(result => {
+                res.status(Code.success).send({code: Code.success, result: result[0]});
+            }).catch(err => {
+                res.status(Code.error).send({code: Code.error, msg: '数据库查询失败！'});
             });
+        }
+    });
+});
+
+/**
+ * 响应审批操作的接口
+ */
+app.post('/approve', bodyParser.json(), (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, err => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: 'token令牌失效，请重新登录！'});
+        } else {
+            console.log(req.body);
+            const {identity, opinion, result} = req.body;
+            approveOrg(identity, result === 'approve').then((email) => {
+                if (result === 'approve') {
+                    initOrgResource(identity).then(() => {
+                        //发送邮件回执
+                        emailTo(email, '【飞云注册申请通过】', '', '<p>恭喜您！</p><p>您申请的飞云互联办公系统已经审批通过！飞云将为您的企业带来革命性的办公体验，马上登录体验吧！</p>', () => {
+                            res.status(Code.success).send({code: Code.success, msg: '企业审核通过，企业资源初始化成功！'});
+                        })
+                    }).catch((err) => {
+                        // console.log(err);
+                        res.status(Code.error).send({code: Code.error, msg: '企业审核通过，企业资源初始化失败！'});
+                    });
+                } else {
+                    //发送邮件回执
+                    emailTo(email, '【飞云注册申请未通过】', '', `<p>您好！</p><p>您申请的飞云互联办公系统经审批审批未通过！具体原因：${opinion}。请登录飞云互联完善相关信息及资料后再次提交申请。</p>`, () => {
+                        res.status(Code.success).send({code: Code.success, msg: '企业审核未通过！'});
+                    })
+                }
+            }).catch((err) => {
+                console.log(err);
+                res.status(Code.error).send({code: Code.error, msg: '企业信息更新失败！'});
+            })
         }
     });
 });

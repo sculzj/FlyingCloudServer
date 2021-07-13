@@ -12,7 +12,6 @@ const moment = require('moment');
  * @type {Logger}
  */
 const logger = require('./log-component').logger;
-// moment().format();
 
 /**
  * 声明存储数据库连接的Map
@@ -30,7 +29,7 @@ const baseParams = {
     port: '3306',
     user: 'root',
     password: '17xy8qzb',
-    timezone:'+8:00'
+    timezone: '+8:00'
 };
 
 const defaultConnection = mysql.createConnection(baseParams, (err) => {
@@ -61,7 +60,7 @@ defaultConnection.connect(err => {
         }
         conMap.set('base', baseCon);
         console.log('默认数据库连接成功！');
-        baseCon.query('select identity from orgs', (err3, result3) => {
+        baseCon.query('select identity from orgs where state=1', (err3, result3) => {
             if (err3) {
                 console.log('默认数据库查询失败！');
                 return;
@@ -189,7 +188,7 @@ function verifyOrgEmail(email) {
 
 function registerOrg(org) {
     org.pwd = MD5(org.pwd);
-    org.apply_time =moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
+    org.apply_time = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
     return new Promise((resolve, reject) => {
         setTimeout(reject, 15000, Status.error);
         conMap.get('base').query(createOrgSql, [org], (err) => {
@@ -233,7 +232,7 @@ function verifyIdentity(identity) {
 }
 
 
-function getOrgGroup(orgEmail) {
+function getOrganizations(orgEmail) {
     return new Promise((resolve, reject) => {
         setTimeout(reject, 15000, '数据库异常，查询失败！');
         defaultConnection.query(searchOrgByEmail, [orgEmail], (err, result) => {
@@ -242,9 +241,9 @@ function getOrgGroup(orgEmail) {
             if (result.length === 0)
                 reject('用户登录信息校验失败！');
             if (result.length === 1) {
-                defaultConnection.query(`select *
-                                         from org_group_${result[0].orgCode.toLocaleLowerCase()}
-                                         order by groupLevel DESC, rankIndex ASC`, [], (err, result2) => {
+                conMap.get(result[0].identity).query(`select *
+                                                      from organizations
+                                                      order by tier DESC, sequence ASC`, [], (err, result2) => {
                     if (err)
                         reject('数据库异常，查询失败！');
                     if (result2.length === 0)
@@ -266,12 +265,13 @@ function updateOrgGroup(orgEmail, group) {
             if (result.length === 0)
                 reject('未查找到企业组织信息，请联系系统管理员！');
             if (result.length === 1) {
+                const con = conMap.get(result[0].identity);
                 const {groupName, parent, groupCode, groupMembers, groupLevel, originalCode} = group;
                 //如果提交的组织节点代码和原组织节点代码一致，则只修改组织名称
                 if (groupCode === originalCode) {
-                    defaultConnection.query(`update org_group_${result[0].orgCode.toLocaleLowerCase()}
-                                             SET groupName = ?
-                                             WHERE groupCode = ?`, [groupName, originalCode], (err1) => {
+                    con.query(`update organizations
+                               SET name = ?
+                               WHERE code = ?`, [groupName, originalCode], (err1) => {
                         if (err1)
                             reject('组织信息更新失败！');
                         resolve('组织信息修改成功！');
@@ -281,8 +281,8 @@ function updateOrgGroup(orgEmail, group) {
                     const rankIndex = Number.parseInt(groupCode.slice(-3));
                     // console.log('1:'+rankIndex);
                     // console.log('2:'+groupCode);
-                    defaultConnection.query(`insert into org_group_${result[0].orgCode.toLocaleLowerCase()}
-                                             SET ?`, {
+                    con.query(`insert into organizations
+                               SET ?`, {
                         groupCode,
                         groupName,
                         parent,
@@ -294,14 +294,14 @@ function updateOrgGroup(orgEmail, group) {
                             reject('组织信息更新失败！');
                         //复制成功后，遍历更新其子节点到新节点下
                         const searchSql = `select *
-                                           from org_group_${result[0].orgCode.toLocaleLowerCase()}
-                                           where parent = ?
-                                           order by groupCode ASC`;
-                        const updateSql = `update org_group_${result[0].orgCode.toLocaleLowerCase()}
-                                           SET groupCode=?,
-                                               parent=?,
-                                               groupLevel=?
-                                           where groupCode = ?`;
+                                           from organizations
+                                           where parentCode = ?
+                                           order by sequence ASC`;
+                        const updateSql = `update organizations
+                                           SET code=?,
+                                               parentCode=?,
+                                               tier=?
+                                           where code = ?`;
                         updateGroupCode(searchSql, updateSql, originalCode, groupCode, reject).then(() => {
                             // console.log('开始执行删除操作...');
                             //先查找顺序标定值
@@ -537,7 +537,7 @@ async function initOrgResource(identity) {
     const theCon = mysql.createConnection({...baseParams, database: identity}, err1 => {
         if (err1)
             throw new Error('企业资源初始化失败，请联系管理员！');
-    })
+    });
     await theCon.connect(err2 => {
         if (err2)
             throw new Error('企业资源初始化失败，请联系管理员！');
@@ -616,12 +616,12 @@ function initSysPwd(data) {
 }
 
 function getApplyOrgs() {
-    return new Promise((resolve,reject)=>{
-        const timerId=setTimeout(reject,15000,'数据库查询失败！');
-        conMap.get('base').query('select name,identity,apply_time from orgs where state= ?',[-1],(err,result)=>{
-            if (err){
+    return new Promise((resolve, reject) => {
+        const timerId = setTimeout(reject, 15000, '数据库查询失败！');
+        conMap.get('base').query('select name,identity,apply_time from orgs where state= ?', [0], (err, result) => {
+            if (err) {
                 reject('数据库查询失败！');
-            }else {
+            } else {
                 resolve(result);
             }
             clearTimeout(timerId);
@@ -629,20 +629,13 @@ function getApplyOrgs() {
     });
 }
 
-function getApplyInfo(identity) {
-    return new Promise((resolve,reject)=>{
-        const timerId=setTimeout(reject,15000,'数据库查询失败！');
-        conMap.get('base').query('select code,name,site,address,identity');
-    });
-}
-
 function uploadApplyFile(data) {
-    return new Promise((resolve,reject)=>{
-        const timerId=setTimeout(reject,15000,'数据库更新失败！');
-        conMap.get('base').query('update orgs set license=?,letter=? where identity=?',[data.license,data.letter,data.identity],(err)=>{
-            if (err){
+    return new Promise((resolve, reject) => {
+        const timerId = setTimeout(reject, 15000, '数据库更新失败！');
+        conMap.get('base').query('update orgs set license=?,letter=? where identity=?', [data.license, data.letter, data.identity], (err) => {
+            if (err) {
                 reject('文件上传失败！');
-            }else {
+            } else {
                 resolve('文件上传成功！');
             }
             clearTimeout(timerId);
@@ -650,16 +643,44 @@ function uploadApplyFile(data) {
     });
 }
 
-function getOrgInfo(identity) {
-    return new Promise((resolve,reject)=>{
-        const timerId=setTimeout(reject,15000,'数据库更新失败！');
-        conMap.get('base').query('select code,name,site,address,identity,apply_time,license,letter from orgs where identity=?',[identity],(err,result)=>{
-            if (err||result.length===0){
+function getApplyInfo(identity) {
+    return new Promise((resolve, reject) => {
+        const timerId = setTimeout(reject, 15000, '数据库更新失败！');
+        conMap.get('base').query('select code,name,site,address,identity,apply_time,license,letter from orgs where identity=?', [identity], (err, result) => {
+            if (err || result.length === 0) {
                 reject('数据库查询失败！');
-            }else {
+            } else {
                 resolve(result);
             }
             clearTimeout(timerId);
+        });
+    });
+}
+
+/**
+ * 根据企业审核结果，更新企业信息
+ * @param identity 企业唯一标识码
+ * @param approve 审核结果，boolean值，true为通过，false为拒绝
+ */
+function approveOrg(identity, approve) {
+    return new Promise((resolve, reject) => {
+        const timerId = setTimeout(reject, 15000, '企业信息更新失败！');
+        const con=conMap.get('base');
+        con.query('update orgs set state=? where identity=?', [approve ? 1 : -1, identity], err => {
+            if (err) {
+                // console.log(err);
+                reject('企业信息更新失败！');
+                clearTimeout(timerId);
+            } else {
+                con.query('select email from orgs where identity=?',[identity],(err1,result)=>{
+                    if (err1){
+                        reject('企业邮箱查询失败！');
+                    }else {
+                        resolve(result[0].email);
+                    }
+                    clearTimeout(timerId);
+                });
+            }
         });
     });
 }
@@ -673,7 +694,7 @@ module.exports = {
     registerOrg,
     verifyOrgEmail,
     verifyOrg,
-    getOrgGroup,
+    getOrganizations,
     updateOrgGroup,
     insertGroupInfo,
     deleteGroup,
@@ -686,5 +707,5 @@ module.exports = {
     getApplyOrgs,
     uploadApplyFile,
     getApplyInfo,
-    getOrgInfo
+    approveOrg
 };
