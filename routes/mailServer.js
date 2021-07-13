@@ -18,11 +18,11 @@ function emailTo(email,subject,text,html,callback) {
         to: email,
         subject: subject,
     };
-    if(text != undefined)
+    if(text)
     {
         mailOptions.text =text;
     }
-    if(html != undefined)
+    if(html)
     {
         mailOptions.html =html;
     }
