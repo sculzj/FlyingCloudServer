@@ -495,38 +495,40 @@ async function updateRankIndex(orgEmail, indexInfo) {
  */
 async function initOrgResource(identity) {
     const createOrgDateBase = `create database ${identity}`;
-    const createOrgGroups = `create table organizations
-                             (
-                                 code       varchar(30) primary key,
-                                 name       varchar(32),
-                                 members    int,
-                                 tier       int,
-                                 parentCode varchar(27),
-                                 parentName varchar(32),
-                                 sequence   int
-                             )`;
+    const createOrganizations = `create table organizations
+                                 (
+                                     code       varchar(30) primary key comment '部门代码',
+                                     name       varchar(32) comment '部门名称',
+                                     members    int default 0 comment '成员数量',
+                                     tier       int comment '部门层级',
+                                     parentCode varchar(27) comment '父节点代码',
+                                     parentName varchar(32) comment '父节点名称',
+                                     sequence   int comment '部门排序'
+                                 )`;
     const createOrgUsers = `create table users
                             (
-                                uid          varchar(32) primary key,
-                                pwd          varchar(32),
-                                name         varchar(16),
-                                email        varchar(32),
-                                phone        int(11),
-                                shortPhone   int(6),
-                                nick         varchar(16),
-                                orgCode      varchar(30),
-                                orgName      varchar(32),
-                                department   varchar(32),
-                                groupCode    varchar(30),
-                                role         int,
-                                post         varchar(16),
-                                title        varchar(16),
-                                state        varchar(128),
-                                backlog      int,
-                                logo         varchar(64),
-                                icon         varchar(64),
-                                onlineByDesk int,
-                                onlineByApp  int
+                                uid          varchar(32) primary key comment '用户id',
+                                pwd          varchar(32) comment '用户密码',
+                                name         varchar(16) comment '用户名称',
+                                email        varchar(32) comment '邮箱',
+                                phone        int(11) comment '移动电话',
+                                shortPhone   int(6) comment '短号',
+                                nick         varchar(16) comment '昵称',
+                                orgCode      varchar(30) comment '归属企业代码',
+                                orgName      varchar(32) comment '归属企业名称',
+                                department   varchar(32) comment '归属部门名称',
+                                groupCode    varchar(30) comment '归属部门代码',
+                                role         int comment '角色，0~10为部门负责人，11及以后表示普通员工，部门人员排序依据',
+                                post         varchar(16) comment '职务',
+                                title        varchar(16) comment '头衔称号',
+                                state        int default 1 comment '账号状态，1-正常，0-冻结，-1-注销',
+                                status       int default 0 comment '个人状态，1-正常，2-忙碌，3-空闲，4-崩溃，5-出差，6-休假',
+                                mood         varchar(64) comment '个人心情',
+                                backlog      int default 0 comment '待办事项',
+                                logo         varchar(64) comment '企业logo',
+                                icon         varchar(64) comment '个人头像',
+                                onlineByDesk int default -1 comment 'PC在线状态，-1-离线，1-在线',
+                                onlineByApp  int default -1 comment 'APP在线状态，-1-离线，1-在线'
                             )`;
     await defaultConnection.query(createOrgDateBase, (err) => {
         if (err)
@@ -544,7 +546,7 @@ async function initOrgResource(identity) {
         else
             conMap.set(identity, theCon);
     });
-    await theCon.query(createOrgGroups, err3 => {
+    await theCon.query(createOrganizations, err3 => {
         if (err3)
             throw new Error('企业资源初始化失败，请联系管理员！');
         else {
@@ -665,17 +667,17 @@ function getApplyInfo(identity) {
 function approveOrg(identity, approve) {
     return new Promise((resolve, reject) => {
         const timerId = setTimeout(reject, 15000, '企业信息更新失败！');
-        const con=conMap.get('base');
-        con.query('update orgs set state=? where identity=?', [approve ? 1 : -1, identity], err => {
+        const con = conMap.get('base');
+        con.query('update orgs set state=?,register_time=? where identity=?', [approve ? 1 : -1, moment(new Date()).format('YYYY-MM-DD HH:mm:ss'), identity], err => {
             if (err) {
                 // console.log(err);
                 reject('企业信息更新失败！');
                 clearTimeout(timerId);
             } else {
-                con.query('select email from orgs where identity=?',[identity],(err1,result)=>{
-                    if (err1){
+                con.query('select email from orgs where identity=?', [identity], (err1, result) => {
+                    if (err1) {
                         reject('企业邮箱查询失败！');
-                    }else {
+                    } else {
                         resolve(result[0].email);
                     }
                     clearTimeout(timerId);

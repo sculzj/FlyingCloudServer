@@ -477,7 +477,7 @@ app.post('/approve', bodyParser.json(), (req, res) => {
                             res.status(Code.success).send({code: Code.success, msg: '企业审核通过，企业资源初始化成功！'});
                         })
                     }).catch((err) => {
-                        // console.log(err);
+                        console.log(err);
                         res.status(Code.error).send({code: Code.error, msg: '企业审核通过，企业资源初始化失败！'});
                     });
                 } else {
