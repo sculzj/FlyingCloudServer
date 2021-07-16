@@ -687,6 +687,40 @@ function approveOrg(identity, approve) {
     });
 }
 
+/**
+ * 查找系统用户id
+ * @param uid
+ */
+function verifySysUid(uid) {
+    return new Promise((resolve, reject) => {
+        const timerId = setTimeout(reject, 15000, '数据库链接失败！');
+        conMap.get('base').query('select uid from sys_users where uid=?', [uid], (err, result) => {
+            if (err) {
+                reject('数据库查询出错！');
+            } else {
+                resolve(result);
+            }
+            clearTimeout(timerId);
+        });
+    });
+}
+
+function addSysUser(userinfo) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(reject, 15000, '数据库操作失败！');
+        conMap.get('base').query('insert into sys_users (uid, pwd, start,end,view,approve,userControl,push,app,other,mobile) values (?,?,?,?,?,?,?,?,?,?,?)',
+            [userinfo.uid, userinfo.pwd, userinfo.start, userinfo.end, userinfo.view, userinfo.approve, userinfo.userControl, userinfo.push, userinfo.app, userinfo.other,userinfo.mobile], err => {
+                if (err) {
+                    console.log(err);
+                    reject('账号创建失败！');
+                } else {
+                    resolve('账号创建成功！')
+                }
+                clearTimeout(timer);
+            });
+    });
+}
+
 module.exports = {
     verifyUser,
     getUserInfo,
@@ -709,5 +743,7 @@ module.exports = {
     getApplyOrgs,
     uploadApplyFile,
     getApplyInfo,
-    approveOrg
+    approveOrg,
+    verifySysUid,
+    addSysUser
 };

@@ -32,7 +32,9 @@ const {
     getApplyOrgs,
     uploadApplyFile,
     getApplyInfo,
-    approveOrg
+    approveOrg,
+    verifySysUid,
+    addSysUser
 } = require('./mysqlMiddleWare');
 /**
  * 引入自定义模块
@@ -391,7 +393,16 @@ app.post('/system', bodyParser.json(), (req, res) => {
                 if (err) {
                     res.status(Code.success).send({code: Code.error, msg: 'token令牌生成失败！'});
                 } else {
-                    const userinfo = {uid: result[0].uid, init: result[0].init};
+                    const userinfo = {
+                        uid: result[0].uid,
+                        init: result[0].init,
+                        view: result[0].view,
+                        approve: result[0].approve,
+                        userControl: result[0].userControl,
+                        push: result[0].push,
+                        app: result[0].app,
+                        other: result[0].other
+                    };
                     res.status(Code.success).send({code: Code.success, userObj: userinfo, token: token});
                 }
             });
@@ -467,7 +478,7 @@ app.post('/approve', bodyParser.json(), (req, res) => {
         if (err) {
             res.status(Code.refused).send({code: Code.refused, msg: 'token令牌失效，请重新登录！'});
         } else {
-            console.log(req.body);
+            // console.log(req.body);
             const {identity, opinion, result} = req.body;
             approveOrg(identity, result === 'approve').then((email) => {
                 if (result === 'approve') {
@@ -489,6 +500,43 @@ app.post('/approve', bodyParser.json(), (req, res) => {
             }).catch((err) => {
                 console.log(err);
                 res.status(Code.error).send({code: Code.error, msg: '企业信息更新失败！'});
+            })
+        }
+    });
+});
+
+app.post('/verifySysUid', bodyParser.json(), (req, res) => {
+    const {uid} = req.body;
+    // console.log(uid);
+    verifySysUid(uid).then(result => {
+        if (result.length === 0) {
+            res.status(Code.success).send({code: Code.success, msg: '该用户不存在，可以注册！'});
+        } else {
+            res.status(Code.refused).send({code: Code.error, msg: '该用户已存在，不允许重复注册！'});
+        }
+    }).catch(() => {
+        res.status(Code.error).send({code: Code.error, msg: '数据库查询出错！'});
+    })
+});
+
+/**
+ * 创建系统管理员的请求接口
+ */
+app.post('/addSysUser', bodyParser.json(), (req, res) => {
+    // console.log(req.body);
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: 'token令牌已过期，请重新登录。'});
+        } else {
+            const {userinfo} = req.body;
+            userinfo.pwd = MD5(userinfo.pwd);
+            // userinfo.mobile=Number.parseInt(userinfo.mobile);
+            addSysUser(userinfo).then(() => {
+                    res.status(Code.success).send({code: Code.success, msg: '账号添加成功!'});
+                }
+            ).catch(()=>{
+                res.status(Code.error).send({code:Code.error,msg:'账号添加失败！'});
             })
         }
     });
