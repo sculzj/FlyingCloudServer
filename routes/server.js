@@ -34,7 +34,8 @@ const {
     getApplyInfo,
     approveOrg,
     verifySysUid,
-    addSysUser
+    addSysUser,
+    getAuthList
 } = require('./mysqlMiddleWare');
 /**
  * 引入自定义模块
@@ -538,6 +539,24 @@ app.post('/addSysUser', bodyParser.json(), (req, res) => {
             ).catch(()=>{
                 res.status(Code.error).send({code:Code.error,msg:'账号添加失败！'});
             })
+        }
+    });
+});
+
+app.post('/authList',bodyParser.json(),(req, res) => {
+    const token=req.headers.authorization;
+    jwt.verify(token,privateKey,err=>{
+        if (err){
+            console.log(err);
+            res.status(Code.refused).send({code:Code.refused,msg:'token令牌已过期，请重新登录。'});
+        }else {
+            getAuthList().then(result=>{
+                // console.log(result)
+                res.status(Code.success).send({code:Code.success,list:result});
+            }).catch(e=>{
+                console.log(e);
+                res.status(Code.error).send({code:Code.error,msg:'数据库查询失败！'});
+            });
         }
     });
 });

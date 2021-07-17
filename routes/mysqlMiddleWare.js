@@ -721,6 +721,21 @@ function addSysUser(userinfo) {
     });
 }
 
+function getAuthList(){
+    return new Promise((resolve,reject)=>{
+        const timer=setTimeout(reject,15000,'数据库操作失败');
+        conMap.get('base').query('select uid,state,start,end,view,approve,userControl,push,app,other,mobile from sys_users where root=?',[-1],(err,result)=>{
+            if (err){
+                reject('数据库操作失败！');
+                clearTimeout(timer);
+            }else {
+                resolve(result);
+                clearTimeout(timer);
+            }
+        });
+    });
+}
+
 module.exports = {
     verifyUser,
     getUserInfo,
@@ -745,5 +760,6 @@ module.exports = {
     getApplyInfo,
     approveOrg,
     verifySysUid,
-    addSysUser
+    addSysUser,
+    getAuthList
 };
