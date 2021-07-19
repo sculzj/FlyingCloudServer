@@ -736,6 +736,75 @@ function getAuthList(){
     });
 }
 
+/**
+ * 删除系统用户
+ * @param uid 用户id
+ * @returns {*}
+ */
+function deleteSysUser(uid) {
+    return new Promise((resolve,reject)=>{
+        const timer=setTimeout(reject,15000,'数据库连接超时！');
+       conMap.get('base').query('delete from sys_users where uid=?',[uid],(err)=>{
+           if (err){
+               logger.error('数据库错误：',err);
+               reject('数据库操作失败！');
+           }else {
+               resolve('账户删除成功！');
+           }
+           clearTimeout(timer);
+       });
+    });
+}
+
+/**
+ * 改变系统用户状态
+ * @param uid 用户id
+ * @param state 用户状态：1-有效，0-有效期超期,-1-冻结
+ * @returns {*}
+ */
+function changeSysUserState(uid,state) {
+    return new Promise((resolve,reject)=>{
+        const timer=setTimeout(reject,15000,'数据库连接超时！');
+        conMap.get('base').query('update sys_users set state=? where uid=?',[state,uid],err=>{
+            if (err){
+                logger.error('数据库错误：',err);
+                reject('数据库操作失败！');
+            }else {
+                resolve('账户状态更新成功！');
+            }
+            clearTimeout(timer);
+        });
+    });
+}
+
+/**
+ * 更新系统用户账户信息
+ * @param state 状态
+ * @param view 数据看板权限
+ * @param approve 企业审批权限
+ * @param userControl 用户管理权限
+ * @param push 消息推送权限
+ * @param app 移动登录权限
+ * @param other 预留权限
+ * @param end 结束有效期
+ * @param uid 用户id
+ * @returns {*}
+ */
+function updateSysUser(state,view,approve,userControl,push,app,other,end,uid) {
+    return new Promise((resolve,reject)=>{
+        const timer=setTimeout(reject,15000,'数据库连接超时！');
+        conMap.get('base').query('update sys_users set state=?,view=?,approve=?,userControl=?,push=?,app=?,other=?,end=? where uid=?',[state,view,approve,userControl,push,app,other,end,uid],err=>{
+            if (err){
+                logger.error('数据库错误：',err);
+                reject('数据库操作失败！');
+            }else {
+                resolve('账户信息更新成功！');
+            }
+            clearTimeout(timer);
+        });
+    });
+}
+
 module.exports = {
     verifyUser,
     getUserInfo,
@@ -761,5 +830,8 @@ module.exports = {
     approveOrg,
     verifySysUid,
     addSysUser,
-    getAuthList
+    getAuthList,
+    deleteSysUser,
+    changeSysUserState,
+    updateSysUser
 };

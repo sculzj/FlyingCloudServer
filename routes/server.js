@@ -10,6 +10,7 @@ const MD5 = require('MD5');
 const formidable = require('formidable');
 const Excel = require('exceljs');
 const {emailTo} = require("./mailServer");
+const moment = require('moment');
 const {
     verifyUser,
     getProductInfo,
@@ -35,7 +36,10 @@ const {
     approveOrg,
     verifySysUid,
     addSysUser,
-    getAuthList
+    getAuthList,
+    deleteSysUser,
+    changeSysUserState,
+    updateSysUser
 } = require('./mysqlMiddleWare');
 /**
  * 引入自定义模块
@@ -378,35 +382,53 @@ app.post('/batchAddMembers', (req, res) => {
     });
 });
 
+/**
+ * 系统用户登录的请求接口
+ */
 app.post('/system', bodyParser.json(), (req, res) => {
     // console.log(req.body);
     const {uid, pwd} = req.body;
     verifySysUser(uid, MD5(pwd)).then(result => {
         // console.log(result);
         if (result.length === 0) {
-            res.status(Code.success).send({code: Code.error, msg: '用户不存在！'});
+            res.status(Code.success).send({code: Code.refused, msg: '登录失败，请检查账户输入是否正确！'});
         } else {
-            jwt.sign({
-                algorithm: 'RS256',
-                data: result.uid,
-                exp: Math.floor(Date.now() / 1000) + (60 * 60) * 12
-            }, privateKey, (err, token) => {
-                if (err) {
-                    res.status(Code.success).send({code: Code.error, msg: 'token令牌生成失败！'});
-                } else {
-                    const userinfo = {
-                        uid: result[0].uid,
-                        init: result[0].init,
-                        view: result[0].view,
-                        approve: result[0].approve,
-                        userControl: result[0].userControl,
-                        push: result[0].push,
-                        app: result[0].app,
-                        other: result[0].other
-                    };
-                    res.status(Code.success).send({code: Code.success, userObj: userinfo, token: token});
+            if (result[0].state!==1){
+                //如果状态不正常，则拒绝登录！
+                res.status(Code.success).send({code:Code.refused,msg:'账户被冻结或已超过有效期，请联系管理员处理！'});
+            }else {
+                //判断账户有效期，如超期，则拒绝登录，并同步修改账户状态;
+                if (moment().endOf('day')>moment(result[0].end)){
+                    // console.log('账户有效期超期！')
+                    res.status(Code.success).send({code:Code.refused,msg:'账户有效期超期，请联系管理员申请延期！'});
+                    changeSysUserState(uid,0).then().catch(err=>{
+                        logger.error('数据库错误：',err);
+                    });
+                }else{
+                    //账户处于有效期内且正常，曾回执token；
+                    jwt.sign({
+                        algorithm: 'RS256',
+                        data: result.uid,
+                        exp: Math.floor(Date.now() / 1000) + (60 * 60) * 12
+                    }, privateKey, (err, token) => {
+                        if (err) {
+                            res.status(Code.success).send({code: Code.refused, msg: 'token令牌生成失败！'});
+                        } else {
+                            const userinfo = {
+                                uid: result[0].uid,
+                                init: result[0].init,
+                                view: result[0].view,
+                                approve: result[0].approve,
+                                userControl: result[0].userControl,
+                                push: result[0].push,
+                                app: result[0].app,
+                                other: result[0].other
+                            };
+                            res.status(Code.success).send({code: Code.success, userObj: userinfo, token: token});
+                        }
+                    });
                 }
-            });
+            }
         }
     }).catch(() => {
         // console.log(err)
@@ -414,6 +436,9 @@ app.post('/system', bodyParser.json(), (req, res) => {
     });
 });
 
+/**
+ * 获取密保问题的请求接口
+ */
 app.get('/questions', (_, res) => {
     // console.log('获取到请求');
     getQuestions().then(result => {
@@ -423,6 +448,9 @@ app.get('/questions', (_, res) => {
     });
 });
 
+/**
+ * 接受系统管理员账户初始化的接口
+ */
 app.post('/initSysPwd', bodyParser.json(), (req, res) => {
     // console.log(req.body);
     const {uid, pwd, question1, answer1, question2, answer2, question3, answer3} = req.body;
@@ -436,6 +464,9 @@ app.post('/initSysPwd', bodyParser.json(), (req, res) => {
     })
 });
 
+/**
+ * 获取企业申请列表的请求接口
+ */
 app.post('/applyOrgs', (req, res) => {
     // console.log('接收到请求')
     const token = req.headers.authorization;
@@ -453,6 +484,9 @@ app.post('/applyOrgs', (req, res) => {
     });
 });
 
+/**
+ * 获取企业申请注册信息的请求列表
+ */
 app.post('/approveInfo', bodyParser.json(), (req, res) => {
     const token = req.headers.authorization;
     jwt.verify(token, privateKey, err => {
@@ -506,6 +540,9 @@ app.post('/approve', bodyParser.json(), (req, res) => {
     });
 });
 
+/**
+ * 校验系统账户是否可用的接口
+ */
 app.post('/verifySysUid', bodyParser.json(), (req, res) => {
     const {uid} = req.body;
     // console.log(uid);
@@ -543,6 +580,9 @@ app.post('/addSysUser', bodyParser.json(), (req, res) => {
     });
 });
 
+/**
+ * 获取用户授权列表的请求接口
+ */
 app.post('/authList',bodyParser.json(),(req, res) => {
     const token=req.headers.authorization;
     jwt.verify(token,privateKey,err=>{
@@ -560,3 +600,86 @@ app.post('/authList',bodyParser.json(),(req, res) => {
         }
     });
 });
+
+/**
+ * 删除系统账户信息请求接口
+ */
+app.delete('/deleteSysUser',bodyParser.json(),(req, res) => {
+    const token=req.headers.authorization;
+    jwt.verify(token,privateKey,err=>{
+        if (err){
+            logger.error('鉴权失败：',err);
+            res.status(Code.refused).send({code:Code.refused,msg:'token令牌已过期，请重新登录。'});
+        }else {
+            const {uid}=req.body;
+            deleteSysUser(uid).then(()=>{
+                res.status(Code.success).send({code:Code.success,msg:'操作成功，账户信息已删除！'});
+            }).catch(()=>{
+                res.status(Code.error).send({code:Code.error,msg:'数据库错误，账户删除失败！'});
+            });
+        }
+    });
+});
+
+/**
+ * 冻结系统账户信息请求接口
+ */
+app.put('/freezeSyUser',bodyParser.json(),(req, res) => {
+    const token=req.headers.authorization;
+    jwt.verify(token,privateKey,err=>{
+        if (err){
+            logger.error('鉴权失败：',err);
+            res.status(Code.refused).send({code:Code.refused,msg:'token令牌已过期，请重新登录。'});
+        }else {
+            const {uid}=req.body;
+            changeSysUserState(uid,-1).then(()=>{
+                res.status(Code.success).send({code:Code.success,msg:'账户已冻结！'});
+            }).catch((err)=>{
+                logger.error('数据操作失败：',err);
+                res.status(Code.error).send({code:Code.error,msg:'账户状态修改失败！'});
+            });
+        }
+    });
+});
+
+/**
+ * 激活系统账户信息请求接口
+ */
+app.put('/activeSyUser',bodyParser.json(),(req, res) => {
+    const token=req.headers.authorization;
+    jwt.verify(token,privateKey,err=>{
+        if (err){
+            logger.error('鉴权失败：',err);
+            res.status(Code.refused).send({code:Code.refused,msg:'token令牌已过期，请重新登录。'});
+        }else {
+            const {uid}=req.body;
+            changeSysUserState(uid,1).then(()=>{
+                res.status(Code.success).send({code:Code.success,msg:'账户已启用！'});
+            }).catch((err)=>{
+                logger.error('数据操作失败：',err);
+                res.status(Code.error).send({code:Code.error,msg:'账户状态修改失败！'});
+            });
+        }
+    });
+});
+
+/**
+ * 修改系统个账户信息请求接口
+ */
+app.put('/editSysUser',bodyParser.json(),(req, res) => {
+    const token=req.headers.authorization;
+    jwt.verify(token,privateKey,err=>{
+        if (err){
+            logger.error('鉴权失败：',err);
+            res.status(Code.refused).send({code:Code.refused,msg:'token令牌已过期，请重新登录。'});
+        }else {
+            const {state,view,approve,userControl,push,app,other,end,uid}=req.body.data;
+            updateSysUser(state,view,approve,userControl,push,app,other,end,uid).then(()=>{
+                res.status(Code.success).send({code:Code.success,msg:'账户信息更新成功！'});
+            }).catch(err=>{
+                logger.error('数据库操作失败：',err);
+                res.status(Code.error).send({code:Code.error,msg:'账户信息更新失败！'});
+            })
+        }
+    });
+})
