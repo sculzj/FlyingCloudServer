@@ -5,7 +5,6 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
-const {nanoid} = require('nanoid');
 const MD5 = require('MD5');
 const formidable = require('formidable');
 const Excel = require('exceljs');
@@ -25,8 +24,7 @@ const {
     verifyOrgCode,
     registerOrg,
     verifyOrgEmail,
-    deleteGroup,
-    updateRankIndex,
+    deleteOrg,
     initCompanyResource,
     verifyIdentity,
     verifySysUser,
@@ -45,10 +43,9 @@ const {
     getCompaniesList,
     exportCompaniesInfo,
     getTemplateList,
-    updateTemplateList, userToLogin, adminToLogin, getOrgsInfo, insertOrgInfo, updateOrgsInfo
+    updateTemplateList, userToLogin, adminToLogin, getOrgsInfo, insertOrgInfo, updateOrgsInfo, getPayingProductInfo,
+    getShoppingProduct
 } = require('./mysqlMiddleWare');
-const {success} = require("webpack-cli/lib/utils/logger");
-const {decode} = require("jsonwebtoken");
 // const {verifyUserLogin,getProductInfo} = require('./redisMiddleWare');
 
 const app = express();
@@ -179,31 +176,25 @@ app.post('/qrcode', bodyParser.json(), (req, res) => {
 /**
  * 更新企业组织信息的接口
  */
-app.post('/updateOrgsInfo',bodyParser.json(),(req, res) => {
-    const token=req.headers.authorization;
-    jwt.verify(token,privateKey,(err,decode)=>{
-        if (err){
-            res.status(Code.refused).send({code:Code.refused,msg:INFO.TOKEN_DATE_OUT});
-        }else {
-            const {data}=req.body;
-            updateOrgsInfo(decode.data.identity,data).then(()=>{
-                res.status(Code.success).send({code:Code.success,msg:'组织信息更新成功！'});
-            }).catch(()=>{
-                res.status(Code.error).send({code:Code.error,msg:'组织信息更新失败！'});
+app.post('/updateOrgsInfo', bodyParser.json(), (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err, decode) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: INFO.TOKEN_DATE_OUT});
+        } else {
+            const {data} = req.body;
+            updateOrgsInfo(decode.data.identity, data).then(() => {
+                res.status(Code.success).send({code: Code.success, msg: '组织信息更新成功！'});
+            }).catch(() => {
+                res.status(Code.error).send({code: Code.error, msg: '组织信息更新失败！'});
             });
         }
     });
 });
 
-app.get('/product', async (_, res) => {
-    try {
-        const result = await getProductInfo();
-        res.status(Code.success).send(result);
-    } catch (e) {
-
-    }
-});
-
+/**
+ * 获取话题排行的请求接口
+ */
 app.get('/topicRank', async (_, res) => {
     const result = await getRank();
     res.send(result);
@@ -221,52 +212,8 @@ app.post('/home', (req, res) => {
     })
 });
 
-app.post('/verifyOrgCode', bodyParser.json(), async (req, res) => {
-    const result = await verifyOrgCode(req.body.code);
-    try {
-        if (result) {
-            res.status(Code.success).send({state: Status.success, msg: '该企业已注册!'});
-        } else {
-            res.status(Code.success).send({state: Status.failed, msg: '该企业未注册！'});
-        }
-    } catch (e) {
-
-    }
-});
-
-app.post('/verifyOrgEmail', bodyParser.json(), async (req, res) => {
-    try {
-        const result = await verifyOrgEmail(req.body.email);
-        if (result) {
-            res.status(Code.success).send({state: Status.success, msg: '该企业已注册!'});
-        } else {
-            res.status(Code.success).send({state: Status.failed, msg: '该企业未注册！'});
-        }
-    } catch (e) {
-
-    }
-});
-
-/**
- * 实时验证识别码的请求接口
- */
-app.post('/verifyIdentity', bodyParser.json(), async (req, res) => {
-    try {
-        await verifyIdentity(req.body.identity);
-        res.status(Code.success).send({state: Status.success, msg: '该识别码可以使用！'});
-    } catch (e) {
-        res.status(Code.error).send({state: Status.error, msg: e.message});
-    }
-});
 
 app.post('/register', bodyParser.json(), (req, res) => {
-    // try {
-    //     // console.log(req.body);
-    //
-    //
-    // } catch (err) {
-    //
-    // }
     registerOrg(req.body).then(() => {
         res.status(Code.success).send({state: Status.success, msg: '注册信息写入成功，准备上传文件。'});
     }).catch(err => {
@@ -326,14 +273,17 @@ app.post('/orgsInfo', (req, res) => {
     })
 });
 
+/**
+ * 添加企业组织的请求接口
+ */
 app.put('/addOrg', bodyParser.json(), (req, res) => {
     const token = req.headers.authorization;
     jwt.verify(token, privateKey, async (err, decoded) => {
         if (err) {
             res.status(Code.refused).send({code: Code.refused, msg: '登录信息已过期，请重新登录！'});
         } else {
-            const {code, name, members, tier, parentCode, parentName, sequence,garden,building,room} = req.body;
-            insertOrgInfo(decoded.data.identity, [code, name, members, tier, parentCode, parentName, sequence,garden,building,room]).then(() => {
+            const {code, name, members, tier, parentCode, parentName, sequence, garden, building, room} = req.body;
+            insertOrgInfo(decoded.data.identity, [code, name, members, tier, parentCode, parentName, sequence, garden, building, room]).then(() => {
                 res.status(Code.success).send({code: Code.success, msg: '组织添加成功！'});
             }).catch((err) => {
                 logger.error(err);
@@ -343,13 +293,16 @@ app.put('/addOrg', bodyParser.json(), (req, res) => {
     })
 });
 
-app.delete('/deleteGroup', bodyParser.json(), (req, res) => {
+/**
+ * 删除企业组织的请求接口
+ */
+app.delete('/deleteOrg', bodyParser.json(), (req, res) => {
     const token = req.headers.authorization;
     jwt.verify(token, privateKey, (err, decoded) => {
         if (err) {
-            res.status(Code.refused).send({code: Code.refused, msg:INFO.TOKEN_DATE_OUT});
+            res.status(Code.refused).send({code: Code.refused, msg: INFO.TOKEN_DATE_OUT});
         } else {
-            deleteGroup(decoded.data.identity, req.body.code).then(() => {
+            deleteOrg(decoded.data.identity, req.body.code).then(() => {
                 res.status(Code.success).send({code: Code.success, msg: '组织删除成功！'});
             }).catch((e) => {
                 res.status(Code.error).send({code: Code.error, msg: e.message});
@@ -358,22 +311,6 @@ app.delete('/deleteGroup', bodyParser.json(), (req, res) => {
     })
 });
 
-app.put('/orderOrgGroup', bodyParser.json(), (req, res) => {
-    const token = req.headers.authorization;
-    jwt.verify(token, privateKey, (err, decode) => {
-        if (err) {
-            res.status(Code.refused).send({code: Code.refused, msg: '登录信息已过期，请重新登录！'});
-        } else {
-            try {
-                updateRankIndex(decode.data, req.body).then(() => {
-                    res.status(Code.success).send({code: Code.success, msg: '组织顺序更新成功！'});
-                });
-            } catch (e) {
-                res.status(Code.error).send({code: Code.error, msg: e.message});
-            }
-        }
-    })
-});
 
 app.post('/batchAddMembers', (req, res) => {
     const token = req.headers.authorization;
@@ -482,15 +419,15 @@ app.post('/initSysPwd', bodyParser.json(), (req, res) => {
 app.post('/applyOrgs', (req, res) => {
     // console.log('接收到请求')
     const token = req.headers.authorization;
-    jwt.verify(token, privateKey, (err, decode) => {
+    jwt.verify(token, privateKey, (err) => {
         if (err) {
             res.status(Code.refused).send({code: Code.refused, msg: 'token令牌失效，请重新登录！'});
         } else {
             // console.log(decode);
             getApplyOrgs().then(result => {
                 res.status(Code.success).send({code: Code.success, result});
-            }).catch(reason => {
-                // console.log(reason)
+            }).catch(err => {
+                console.log(err)
                 res.status(Code.error).send({code: Code.error, msg: '数据库错误！'})
             });
         }
@@ -511,6 +448,7 @@ app.post('/approveInfo', bodyParser.json(), (req, res) => {
             getApplyInfo(key).then(result => {
                 res.status(Code.success).send({code: Code.success, result: result[0]});
             }).catch(err => {
+                console.log(err);
                 res.status(Code.error).send({code: Code.error, msg: '数据库查询失败！'});
             });
         }
@@ -677,7 +615,7 @@ app.put('/activeSyUser', bodyParser.json(), (req, res) => {
 });
 
 /**
- * 修改系统个账户信息请求接口
+ * 修改系统账户信息请求接口
  */
 app.put('/editSysUser', bodyParser.json(), (req, res) => {
     const token = req.headers.authorization;
@@ -794,6 +732,33 @@ app.post('/updateSysMsgTemplateDir', bodyParser.json(), (req, res) => {
             }).catch(err => {
                 res.status(Code.error).send({code: Code.error, msg: '消息模板目录更新失败！'});
                 logger.error(`用户${uid}消息目录更新失败：`, err);
+            });
+        }
+    });
+});
+
+/**
+ * 获取产品商城内增值产品以及购物车、促销等信息的接口
+ */
+app.get('/productInfo',(req, res) => {
+    const token=req.headers.authorization;
+    jwt.verify(token,privateKey,(err,decode)=>{
+        if (err){
+            res.status(Code.refused).send({code:Code.refused,msg:INFO.TOKEN_DATE_OUT});
+        }else {
+            const data={code:Code.success};
+            getPayingProductInfo().then(result=>{
+                data.product=result;
+                getShoppingProduct(decode.data.identity).then(result1=>{
+                    data.shopping=result1;
+                    res.status(Code.success).send(data);
+                }).catch(err1=>{
+                    console.log(err1);
+                    res.status(Code.error).send({code:Code.error,msg:INFO.DATABASE_QUERY_ERR});
+                });
+            }).catch(err=>{
+                console.log(err);
+                res.status(Code.error).send({code:Code.error,msg:INFO.DATABASE_QUERY_ERR});
             });
         }
     });
