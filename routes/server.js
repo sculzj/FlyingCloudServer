@@ -11,21 +11,23 @@ const formidable = require('formidable');
 const Excel = require('exceljs');
 const {emailTo} = require("./mailServer");
 const moment = require('moment');
+
+/**
+ * 引入自定义模块
+ */
+const logger = require('./log-component').logger;
+const privateKey = fs.readFileSync('../key/private.key');
+const {Status, Code, serverIP, INFO} = require('./constants');
 const {
-    verifyUser,
     getProductInfo,
     getRank,
     getUserInfo,
     verifyOrgCode,
     registerOrg,
     verifyOrgEmail,
-    verifyOrg,
-    updateOrgGroup,
-    getOrganizations,
-    insertGroupInfo,
     deleteGroup,
     updateRankIndex,
-    initOrgResource,
+    initCompanyResource,
     verifyIdentity,
     verifySysUser,
     getQuestions,
@@ -39,147 +41,158 @@ const {
     getAuthList,
     deleteSysUser,
     changeSysUserState,
-    updateSysUser
+    updateSysUser,
+    getCompaniesList,
+    exportCompaniesInfo,
+    getTemplateList,
+    updateTemplateList, userToLogin, adminToLogin, getOrgsInfo, insertOrgInfo, updateOrgsInfo
 } = require('./mysqlMiddleWare');
-/**
- * 引入自定义模块
- */
-const logger = require('./log-component').logger;
-const privateKey = fs.readFileSync('../key/private.key');
-const {Status, Code} = require('./constants');
+const {success} = require("webpack-cli/lib/utils/logger");
+const {decode} = require("jsonwebtoken");
 // const {verifyUserLogin,getProductInfo} = require('./redisMiddleWare');
 
 const app = express();
-const BufferQueue = new Map();
 
-// app.use(express.static('../public'));
+//定义登录二维码Map
+const QRCodeMap = new Map();
+
+app.use(express.static('../public'));
 app.listen('7080', () => {
     logger.info('服务器已启动......')
 });
 
 /**
- * 接收登录请求，验证用户登录信息，根据验证状态执行动作
- * success:验证成功返回登录token
- * refused:验证失败拒绝登录
- * error:数据库错误或其他错误
+ * 用户登录接口
  */
-app.post('/login', bodyParser.json(), async (req, res) => {
-    try {
-        //根据登录账号类型进行校验
-        let result = '';
-        if (req.body.admin) {
-            result = await verifyOrg([req.body.userId, MD5(req.body.pwd)]);
-        } else {
-            result = await verifyUser([req.body.userId, MD5(req.body.pwd)]);
-        }
-        jwt.sign({
-            algorithm: 'RS256',
-            data: result.userId ? result.userId : result.orgEmail,
-            exp: Math.floor(Date.now() / 1000) + (60 * 60) * 12
-        }, privateKey, (err, token) => {
-            if (err) {
-                res.status(Code.success).send({code: Code.error, msg: err});
-            } else {
-                res.status(Code.success).send({code: Code.success, token, userInfo: result});
-            }
+app.post('/login', bodyParser.json(), (req, res) => {
+    const {uid, pwd, identity, admin} = req.body
+    // console.log(req.body);
+    if (admin) {
+        adminToLogin(uid, pwd, identity).then(result => {
+            sendLoginResultToClient(result, identity, res);
+        }).catch(err => {
+            logger.error(err);
+            res.status(Code.error).send({code: Code.error, msg: '系统错误，请联系管理员处理！'});
         });
-    } catch (err) {
-        logger.error(`${req.body.userId}登录失败：${err}`);
-        res.status(Code.error).send({state: Status.error, msg: err});
+    } else {
+        userToLogin(uid, pwd, identity).then(result => {
+            sendLoginResultToClient(result, identity, res);
+        }).catch(err => {
+            logger.error(err);
+            res.status(Code.error).send({code: Code.error, msg: '系统错误，请联系管理员处理！'});
+        })
     }
-});
+
+})
 
 /**
- * 接收二维码登录请求，首次请求生成临时token并返回，客户端携带token轮询二维码状态
- * 通过Map维护二维码临时状态
+ * 根据数据库查询结果，向客户端返回登录结果
+ * @param result 数据库查询结果
+ * @param identity 账号绑定的企业标识
+ * @param res http的response连接
  */
-app.post('/qrcode', (req, res) => {
-    const token = req.headers.authorization;
-    if (token) {
-        //非首次请求校验临时token是否有效
-        jwt.verify(token, privateKey, (err, _) => {
+function sendLoginResultToClient(result, identity, res) {
+    if (result.length === 1) {
+        jwt.sign({
+            algorithm: 'RS256',
+            data: {uid: result[0].uid, identity},
+            exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24)
+        }, privateKey, (err, token) => {
             if (err) {
-                res.send({code: Code.overtime, msg: "二维码已超时，请重新获取。"});
-                BufferQueue.delete(token);
+                res.status(Code.error).send({code: Code.error, msg: 'token令牌生成失败！'});
             } else {
-                const {state} = BufferQueue.get(req.headers.authorization);
-                if (state === Status.waiting) {
-                    res.status(Code.success).send({code: Code.success, msg: "等待扫描二维码。"});
-                } else if (state === Status.ready) {
-                    res.status(Code.success).send({code: Code.success, msg: "请在App上进行登录确认。"});
-                } else if (state === Status.success) {
-                    const {result} = BufferQueue.get(token);
-                    res.status(Code.success).send({code: Code.success, result});
-                    BufferQueue.delete(token);
-                } else if (state === Status.refused) {
-                    res.status(Code.refused).send({code: Code.refused, msg: "已取消二维码登录。"});
-                    BufferQueue.delete(token);
-                }
+                res.status(Code.success).send({code: Code.success, token: token});
             }
         });
     } else {
-        //首次请求生成二维码临时token，有效期120s
-        const id = nanoid();
-        jwt.sign({
-            algorithm: 'RS256',
-            data: id,
-            exp: Math.floor(Date.now() / 1000) + (2 * 60)
-        }, privateKey, (err, token) => {
-            if (err)
-                res.status(Code.error).send({code: Code.error, msg: '二维码拉取失败！'});
-            else {
-                //将临时token推入缓存区，并返回给客户端
-                BufferQueue.set(token, {state: Status.waiting, result: ""});
-                res.status(Code.success).send({code: Code.success, token});
+        res.status(Code.success).send({code: Code.failed, msg: '用户信息错误，登录失败！'});
+    }
+}
+
+/**
+ * 接收web客户端轮巡二维码状态的接口
+ */
+app.post('/roundCodeState', bodyParser.json(), (req, res) => {
+    const {random, valid} = req.body;
+    if (!valid) {
+        res.status(Code.success).send({status: Status.overtime, msg: '二维码已过期！'});
+        QRCodeMap.delete(random);
+    } else if (!QRCodeMap.get(random)) {
+        QRCodeMap.set(random, Status.waiting);
+        res.status(Code.success).send({status: Status.waiting, msg: '等待APP扫描二维码！'});
+    } else if (QRCodeMap.get(random) === Status.waiting) {
+        res.status(Code.success).send({status: Status.waiting, msg: '等待APP扫描二维码！'});
+    } else if (QRCodeMap.get(random) === Status.ready) {
+        res.status(Code.success).send({status: Status.ready, msg: '等待APP确认登录！'});
+    } else if (QRCodeMap.get(random) === Status.refused) {
+        res.status(Code.success).send({status: Status.refused, msg: 'APP已拒绝登录！'});
+        QRCodeMap.delete(random);
+    } else if (QRCodeMap.get(random).startsWith('token:')) {
+        res.status(Code.success).send({
+            status: Status.success,
+            msg: 'APP已允许登录！',
+            token: QRCodeMap.get(random).substring(6)
+        });
+        QRCodeMap.delete(random);
+    }
+})
+
+/**
+ * 接收APP扫描二维码并操作二维码状态的接口
+ */
+app.post('/qrcode', bodyParser.json(), (req, res) => {
+    const token = req.headers.authorization;
+    const {QRCode, option} = req.body;
+    // console.log(req.body);
+    if (!QRCodeMap.get(QRCode)) {
+        res.status(Code.refused).send({status: Status.refused, msg: '二维码已过期！'});
+    } else {
+        jwt.verify(token, privateKey, (err, decode) => {
+            if (err) {
+                res.status(Code.refused).send({Code: Code.refused, msg: '登录信息已过期！'});
+            } else if (option === Code.ready) {
+                QRCodeMap.set(QRCode, Status.ready);
+                res.status(Code.success).send({status: Status.ready, msg: '等待APP确认登录！'});
+            } else if (option === Code.refused) {
+                QRCodeMap.set(QRCode, Status.refused);
+                res.status(Code.success).send({status: Status.refused, msg: 'APP已拒绝登录！'});
+            } else if (option === Code.success) {
+                jwt.sign({
+                        algorithm: 'RS256',
+                        data: decode.data,
+                        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24)
+                    }, privateKey, (err, token) => {
+                        if (err) {
+                            res.status(Code.success).send({status: Status.refused, msg: 'token令牌生成失效，登录失败！'});
+                        } else {
+                            QRCodeMap.set(QRCode, `token:${token}`);
+                            res.status(Code.success).send({status: Status.success, msg: 'APP已允许登录！'});
+                        }
+                    }
+                )
             }
         });
     }
+
 });
 
 /**
- * 接收扫描二维码请求，进行App的token和二维码的token双重校验
- * 通过Map维护二维码的临时状态
+ * 更新企业组织信息的接口
  */
-app.post('/scanCode', bodyParser.json(), (req, res) => {
-    const token = req.headers.authorization;
-    const {tmpToken, isAllow} = req.body;
-    jwt.verify(token, privateKey, (err, _) => {
-        if (err) {
-            res.send({code: Code.error, msg: "token已过期，请重新登录！"});
-            return;
+app.post('/updateOrgsInfo',bodyParser.json(),(req, res) => {
+    const token=req.headers.authorization;
+    jwt.verify(token,privateKey,(err,decode)=>{
+        if (err){
+            res.status(Code.refused).send({code:Code.refused,msg:INFO.TOKEN_DATE_OUT});
+        }else {
+            const {data}=req.body;
+            updateOrgsInfo(decode.data.identity,data).then(()=>{
+                res.status(Code.success).send({code:Code.success,msg:'组织信息更新成功！'});
+            }).catch(()=>{
+                res.status(Code.error).send({code:Code.error,msg:'组织信息更新失败！'});
+            });
         }
-        jwt.verify(tmpToken, privateKey, (error, result) => {
-            if (error) {
-                res.send({code: Code.error, msg: "二维码已过期，请重新扫描！"});
-                return;
-            }
-            if (BufferQueue.get(tmpToken).state === Status.waiting) {
-                BufferQueue.get(tmpToken).state = Status.ready;
-                res.status(Code.success).send({code: Code.success, msg: "二维码已就绪，等待登录！"});
-            } else if (BufferQueue.get(tmpToken).state === Status.ready) {
-                if (isAllow) {
-                    jwt.sign({
-                        algorithm: 'RS256',
-                        data: result.data,
-                        exp: Math.floor(Date.now() / 1000) + (60 * 60)
-                    }, privateKey, (err, newToken) => {
-                        if (err) {
-                            res.status(Code.error).send({code: Code.error, msg: "生成令牌失败！"});
-                        } else {
-                            BufferQueue.get(tmpToken).result = newToken;
-                            BufferQueue.get(tmpToken).state = Status.success;
-                            res.status(Code.success).send({code: Code.success, login: true});
-                        }
-                    });
-                } else {
-                    BufferQueue.get(tmpToken).state = Status.refused;
-                    res.status(Code.success).send({code: Code.success, msg: '已取消二维码登录！'});
-                }
-            } else {
-                res.status(Code.error).send({code: Code.error, msg: '二维码已失效，请重新获取登录二维码！'});
-            }
-        })
-    })
+    });
 });
 
 app.get('/product', async (_, res) => {
@@ -246,14 +259,20 @@ app.post('/verifyIdentity', bodyParser.json(), async (req, res) => {
     }
 });
 
-app.post('/register', bodyParser.json(), async (req, res) => {
-    try {
-        // console.log(req.body);
-        const result = await registerOrg(req.body);
-        res.status(Code.success).send({state: Status.success, msg: result});
-    } catch (err) {
+app.post('/register', bodyParser.json(), (req, res) => {
+    // try {
+    //     // console.log(req.body);
+    //
+    //
+    // } catch (err) {
+    //
+    // }
+    registerOrg(req.body).then(() => {
+        res.status(Code.success).send({state: Status.success, msg: '注册信息写入成功，准备上传文件。'});
+    }).catch(err => {
+        console.log(err);
         res.status(Code.error).send({state: Status.failed, msg: err});
-    }
+    });
 });
 
 app.post('/upload', (req, res) => {
@@ -287,57 +306,50 @@ app.post('/upload', (req, res) => {
     });
 });
 
-app.post('/orgGroup', (req, res) => {
+/**
+ * 获取企业组织信息
+ */
+app.post('/orgsInfo', (req, res) => {
     const token = req.headers.authorization;
-    jwt.verify(token, privateKey, async (err, decoded) => {
+    jwt.verify(token, privateKey, (err, decoded) => {
         if (err) {
-            res.status(Code.refused).send({code: Code.refused, msg: '登录信息已过期，请重新登录！'});
+            res.status(Code.refused).send({code: Code.refused, msg: INFO.TOKEN_DATE_OUT});
         } else {
-            const result = await getOrganizations(decoded.data);
-            res.status(Code.success).send({code: Code.success, groups: result});
+            getOrgsInfo(decoded.data.identity).then(result => {
+                res.status(Code.success).send({code: Code.success, orgsInfo: result});
+            }).catch(err => {
+                res.status(Code.error).send({code: Code.error, msg: INFO.SYSTEM_ERR});
+                logger.error(err);
+            });
+
         }
     })
 });
 
-app.put('/orgGroup', bodyParser.json(), async (req, res) => {
+app.put('/addOrg', bodyParser.json(), (req, res) => {
     const token = req.headers.authorization;
     jwt.verify(token, privateKey, async (err, decoded) => {
         if (err) {
             res.status(Code.refused).send({code: Code.refused, msg: '登录信息已过期，请重新登录！'});
         } else {
-            try {
-                const result = await updateOrgGroup(decoded.data, req.body);
-                res.status(Code.success).send({code: Code.success, msg: result});
-            } catch (err) {
-                res.status(Code.error).send({code: Code.error, msg: err});
-            }
+            const {code, name, members, tier, parentCode, parentName, sequence,garden,building,room} = req.body;
+            insertOrgInfo(decoded.data.identity, [code, name, members, tier, parentCode, parentName, sequence,garden,building,room]).then(() => {
+                res.status(Code.success).send({code: Code.success, msg: '组织添加成功！'});
+            }).catch((err) => {
+                logger.error(err);
+                res.status(Code.error).send({code: Code.error, msg: '组织添加失败！'});
+            });
         }
     })
 });
 
-app.put('/addGroup', bodyParser.json(), async (req, res) => {
+app.delete('/deleteGroup', bodyParser.json(), (req, res) => {
     const token = req.headers.authorization;
-    jwt.verify(token, privateKey, async (err, decoded) => {
+    jwt.verify(token, privateKey, (err, decoded) => {
         if (err) {
-            res.status(Code.refused).send({code: Code.refused, msg: '登录信息已过期，请重新登录！'});
+            res.status(Code.refused).send({code: Code.refused, msg:INFO.TOKEN_DATE_OUT});
         } else {
-            try {
-                const result = await insertGroupInfo(decoded.data, req.body);
-                res.status(Code.success).send({code: Code.success, msg: result});
-            } catch (e) {
-                res.status(Code.error).send({code: Code.error, msg: e.message});
-            }
-        }
-    })
-});
-
-app.delete('/deleteGroup', bodyParser.json(), async (req, res) => {
-    const token = req.headers.authorization;
-    jwt.verify(token, privateKey, async (err, decoded) => {
-        if (err) {
-            res.status(Code.refused).send({code: Code.refused, msg: '登录信息已过期，请重新登录！'});
-        } else {
-            deleteGroup(decoded.data, req.body.groupCode).then(() => {
+            deleteGroup(decoded.data.identity, req.body.code).then(() => {
                 res.status(Code.success).send({code: Code.success, msg: '组织删除成功！'});
             }).catch((e) => {
                 res.status(Code.error).send({code: Code.error, msg: e.message});
@@ -386,29 +398,29 @@ app.post('/batchAddMembers', (req, res) => {
  * 系统用户登录的请求接口
  */
 app.post('/system', bodyParser.json(), (req, res) => {
-    // console.log(req.body);
+    //console.log(req.body);
     const {uid, pwd} = req.body;
     verifySysUser(uid, MD5(pwd)).then(result => {
         // console.log(result);
         if (result.length === 0) {
             res.status(Code.success).send({code: Code.refused, msg: '登录失败，请检查账户输入是否正确！'});
         } else {
-            if (result[0].state!==1){
+            if (result[0].state !== 1) {
                 //如果状态不正常，则拒绝登录！
-                res.status(Code.success).send({code:Code.refused,msg:'账户被冻结或已超过有效期，请联系管理员处理！'});
-            }else {
+                res.status(Code.success).send({code: Code.refused, msg: '账户被冻结或已超过有效期，请联系管理员处理！'});
+            } else {
                 //判断账户有效期，如超期，则拒绝登录，并同步修改账户状态;
-                if (moment().endOf('day')>moment(result[0].end)){
+                if (moment().endOf('day') > moment(result[0].end)) {
                     // console.log('账户有效期超期！')
-                    res.status(Code.success).send({code:Code.refused,msg:'账户有效期超期，请联系管理员申请延期！'});
-                    changeSysUserState(uid,0).then().catch(err=>{
-                        logger.error('数据库错误：',err);
+                    res.status(Code.success).send({code: Code.refused, msg: '账户有效期超期，请联系管理员申请延期！'});
+                    changeSysUserState(uid, 0).then().catch(err => {
+                        logger.error('数据库错误：', err);
                     });
-                }else{
+                } else {
                     //账户处于有效期内且正常，曾回执token；
                     jwt.sign({
                         algorithm: 'RS256',
-                        data: result.uid,
+                        data: result[0].uid,
                         exp: Math.floor(Date.now() / 1000) + (60 * 60) * 12
                     }, privateKey, (err, token) => {
                         if (err) {
@@ -470,10 +482,11 @@ app.post('/initSysPwd', bodyParser.json(), (req, res) => {
 app.post('/applyOrgs', (req, res) => {
     // console.log('接收到请求')
     const token = req.headers.authorization;
-    jwt.verify(token, privateKey, (err) => {
+    jwt.verify(token, privateKey, (err, decode) => {
         if (err) {
             res.status(Code.refused).send({code: Code.refused, msg: 'token令牌失效，请重新登录！'});
         } else {
+            // console.log(decode);
             getApplyOrgs().then(result => {
                 res.status(Code.success).send({code: Code.success, result});
             }).catch(reason => {
@@ -515,11 +528,11 @@ app.post('/approve', bodyParser.json(), (req, res) => {
         } else {
             // console.log(req.body);
             const {identity, opinion, result} = req.body;
-            approveOrg(identity, result === 'approve').then((email) => {
+            approveOrg(identity, result === 'approve').then((company) => {
                 if (result === 'approve') {
-                    initOrgResource(identity).then(() => {
+                    initCompanyResource(company).then((pwd) => {
                         //发送邮件回执
-                        emailTo(email, '【飞云注册申请通过】', '', '<p>恭喜您！</p><p>您申请的飞云互联办公系统已经审批通过！飞云将为您的企业带来革命性的办公体验，马上登录体验吧！</p>', () => {
+                        emailTo(company.email, '【飞云注册申请通过】', '', `<p>恭喜您！</p><p>您申请的飞云互联办公系统已经审批通过！您登录的初始密码为${pwd}。飞云将为您的企业带来革命性的办公体验，马上登录体验吧！</p>`, () => {
                             res.status(Code.success).send({code: Code.success, msg: '企业审核通过，企业资源初始化成功！'});
                         })
                     }).catch((err) => {
@@ -528,7 +541,7 @@ app.post('/approve', bodyParser.json(), (req, res) => {
                     });
                 } else {
                     //发送邮件回执
-                    emailTo(email, '【飞云注册申请未通过】', '', `<p>您好！</p><p>您申请的飞云互联办公系统经审批审批未通过！具体原因：${opinion}。请登录飞云互联完善相关信息及资料后再次提交申请。</p>`, () => {
+                    emailTo(company.email, '【飞云注册申请未通过】', '', `<p>您好！</p><p>您申请的飞云互联办公系统经审批审批未通过！具体原因：${opinion}。您可以再申请，并确保提交的相关信息完善合规。</p>`, () => {
                         res.status(Code.success).send({code: Code.success, msg: '企业审核未通过！'});
                     })
                 }
@@ -573,8 +586,8 @@ app.post('/addSysUser', bodyParser.json(), (req, res) => {
             addSysUser(userinfo).then(() => {
                     res.status(Code.success).send({code: Code.success, msg: '账号添加成功!'});
                 }
-            ).catch(()=>{
-                res.status(Code.error).send({code:Code.error,msg:'账号添加失败！'});
+            ).catch(() => {
+                res.status(Code.error).send({code: Code.error, msg: '账号添加失败！'});
             })
         }
     });
@@ -583,19 +596,19 @@ app.post('/addSysUser', bodyParser.json(), (req, res) => {
 /**
  * 获取用户授权列表的请求接口
  */
-app.post('/authList',bodyParser.json(),(req, res) => {
-    const token=req.headers.authorization;
-    jwt.verify(token,privateKey,err=>{
-        if (err){
+app.post('/authList', bodyParser.json(), (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, err => {
+        if (err) {
             console.log(err);
-            res.status(Code.refused).send({code:Code.refused,msg:'token令牌已过期，请重新登录。'});
-        }else {
-            getAuthList().then(result=>{
+            res.status(Code.refused).send({code: Code.refused, msg: 'token令牌已过期，请重新登录。'});
+        } else {
+            getAuthList().then(result => {
                 // console.log(result)
-                res.status(Code.success).send({code:Code.success,list:result});
-            }).catch(e=>{
+                res.status(Code.success).send({code: Code.success, list: result});
+            }).catch(e => {
                 console.log(e);
-                res.status(Code.error).send({code:Code.error,msg:'数据库查询失败！'});
+                res.status(Code.error).send({code: Code.error, msg: '数据库查询失败！'});
             });
         }
     });
@@ -604,18 +617,18 @@ app.post('/authList',bodyParser.json(),(req, res) => {
 /**
  * 删除系统账户信息请求接口
  */
-app.delete('/deleteSysUser',bodyParser.json(),(req, res) => {
-    const token=req.headers.authorization;
-    jwt.verify(token,privateKey,err=>{
-        if (err){
-            logger.error('鉴权失败：',err);
-            res.status(Code.refused).send({code:Code.refused,msg:'token令牌已过期，请重新登录。'});
-        }else {
-            const {uid}=req.body;
-            deleteSysUser(uid).then(()=>{
-                res.status(Code.success).send({code:Code.success,msg:'操作成功，账户信息已删除！'});
-            }).catch(()=>{
-                res.status(Code.error).send({code:Code.error,msg:'数据库错误，账户删除失败！'});
+app.delete('/deleteSysUser', bodyParser.json(), (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, err => {
+        if (err) {
+            logger.error('鉴权失败：', err);
+            res.status(Code.refused).send({code: Code.refused, msg: 'token令牌已过期，请重新登录。'});
+        } else {
+            const {uid} = req.body;
+            deleteSysUser(uid).then(() => {
+                res.status(Code.success).send({code: Code.success, msg: '操作成功，账户信息已删除！'});
+            }).catch(() => {
+                res.status(Code.error).send({code: Code.error, msg: '数据库错误，账户删除失败！'});
             });
         }
     });
@@ -624,19 +637,19 @@ app.delete('/deleteSysUser',bodyParser.json(),(req, res) => {
 /**
  * 冻结系统账户信息请求接口
  */
-app.put('/freezeSyUser',bodyParser.json(),(req, res) => {
-    const token=req.headers.authorization;
-    jwt.verify(token,privateKey,err=>{
-        if (err){
-            logger.error('鉴权失败：',err);
-            res.status(Code.refused).send({code:Code.refused,msg:'token令牌已过期，请重新登录。'});
-        }else {
-            const {uid}=req.body;
-            changeSysUserState(uid,-1).then(()=>{
-                res.status(Code.success).send({code:Code.success,msg:'账户已冻结！'});
-            }).catch((err)=>{
-                logger.error('数据操作失败：',err);
-                res.status(Code.error).send({code:Code.error,msg:'账户状态修改失败！'});
+app.put('/freezeSyUser', bodyParser.json(), (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, err => {
+        if (err) {
+            logger.error('鉴权失败：', err);
+            res.status(Code.refused).send({code: Code.refused, msg: 'token令牌已过期，请重新登录。'});
+        } else {
+            const {uid} = req.body;
+            changeSysUserState(uid, -1).then(() => {
+                res.status(Code.success).send({code: Code.success, msg: '账户已冻结！'});
+            }).catch((err) => {
+                logger.error('数据操作失败：', err);
+                res.status(Code.error).send({code: Code.error, msg: '账户状态修改失败！'});
             });
         }
     });
@@ -645,19 +658,19 @@ app.put('/freezeSyUser',bodyParser.json(),(req, res) => {
 /**
  * 激活系统账户信息请求接口
  */
-app.put('/activeSyUser',bodyParser.json(),(req, res) => {
-    const token=req.headers.authorization;
-    jwt.verify(token,privateKey,err=>{
-        if (err){
-            logger.error('鉴权失败：',err);
-            res.status(Code.refused).send({code:Code.refused,msg:'token令牌已过期，请重新登录。'});
-        }else {
-            const {uid}=req.body;
-            changeSysUserState(uid,1).then(()=>{
-                res.status(Code.success).send({code:Code.success,msg:'账户已启用！'});
-            }).catch((err)=>{
-                logger.error('数据操作失败：',err);
-                res.status(Code.error).send({code:Code.error,msg:'账户状态修改失败！'});
+app.put('/activeSyUser', bodyParser.json(), (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, err => {
+        if (err) {
+            logger.error('鉴权失败：', err);
+            res.status(Code.refused).send({code: Code.refused, msg: 'token令牌已过期，请重新登录。'});
+        } else {
+            const {uid} = req.body;
+            changeSysUserState(uid, 1).then(() => {
+                res.status(Code.success).send({code: Code.success, msg: '账户已启用！'});
+            }).catch((err) => {
+                logger.error('数据操作失败：', err);
+                res.status(Code.error).send({code: Code.error, msg: '账户状态修改失败！'});
             });
         }
     });
@@ -666,20 +679,122 @@ app.put('/activeSyUser',bodyParser.json(),(req, res) => {
 /**
  * 修改系统个账户信息请求接口
  */
-app.put('/editSysUser',bodyParser.json(),(req, res) => {
-    const token=req.headers.authorization;
-    jwt.verify(token,privateKey,err=>{
-        if (err){
-            logger.error('鉴权失败：',err);
-            res.status(Code.refused).send({code:Code.refused,msg:'token令牌已过期，请重新登录。'});
-        }else {
-            const {state,view,approve,userControl,push,app,other,end,uid}=req.body.data;
-            updateSysUser(state,view,approve,userControl,push,app,other,end,uid).then(()=>{
-                res.status(Code.success).send({code:Code.success,msg:'账户信息更新成功！'});
-            }).catch(err=>{
-                logger.error('数据库操作失败：',err);
-                res.status(Code.error).send({code:Code.error,msg:'账户信息更新失败！'});
+app.put('/editSysUser', bodyParser.json(), (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, err => {
+        if (err) {
+            logger.error('鉴权失败：', err);
+            res.status(Code.refused).send({code: Code.refused, msg: 'token令牌已过期，请重新登录。'});
+        } else {
+            const {state, view, approve, userControl, push, app, other, end, uid} = req.body.data;
+            updateSysUser(state, view, approve, userControl, push, app, other, end, uid).then(() => {
+                res.status(Code.success).send({code: Code.success, msg: '账户信息更新成功！'});
+            }).catch(err => {
+                logger.error('数据库操作失败：', err);
+                res.status(Code.error).send({code: Code.error, msg: '账户信息更新失败！'});
             })
         }
     });
-})
+});
+
+/**
+ * 系统管理员获取企业列表的接口
+ */
+app.post('/getCompaniesList', (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, err => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: 'token令牌已过期，请重新登录'});
+        } else {
+            getCompaniesList().then(result => {
+                res.status(Code.success).send({code: Code.success, result: result});
+            }).catch(err => {
+                console.log(err);
+                res.status(Code.error).send({code: Code.error, msg: '查询企业信息失败！'});
+            });
+        }
+    });
+});
+
+/**
+ * 系统管理员导出企业数据的接口
+ */
+app.post('/exportList', bodyParser.json(), (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, err => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: 'token令牌已过期，请重新登录'});
+        } else {
+            // console.log(req.body);
+            exportCompaniesInfo(req.body.keys).then(result => {
+                res.status(Code.success).send({code: Code.success, result: result});
+            }).catch(err => {
+                logger.error(err);
+                res.status(Code.err).send({code: Code.error, msg: '企业数据导出失败！'});
+            });
+        }
+    });
+});
+
+/**
+ * 接收富文本中的文件上传
+ */
+app.post('/upFile', (req, res) => {
+    const form = formidable({multiples: false});
+    form.parse(req, (err, fields, files) => {
+        if (err) {
+            res.status(Code.error).send({code: Code.error, msg: '服务器接收文件失败！'});
+        } else {
+            const {img} = files;
+            // console.log(img);
+            const readStream = fs.createReadStream(`${img.path}`);
+            const writeStream = fs.createWriteStream(`D:\\Develop Project\\FlyingCloudServer\\public\\images\\userResource\\${img.name}`);
+            readStream.pipe(writeStream);
+            readStream.on('end', () => {
+                console.log(`${img.name}写入完毕！`);
+                res.status(Code.success).send({code: Code.success, url: `${serverIP}/images/userResource/${img.name}`});
+            })
+        }
+    });
+});
+
+/**
+ * 拉取消息模板的请求接口
+ */
+app.post('/sysMsgTemplate', bodyParser.json(), (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: 'token令牌已过期，请重新登录'});
+        } else {
+            // console.log(decode);
+            const {uid} = req.body;
+            getTemplateList(uid).then(result => {
+                res.status(Code.success).send({code: Code.success, result: result[0]});
+            }).catch(err => {
+                logger.error('数据库查询失败:', err);
+                res.status(Code.error).send({code: Code.error, msg: '数据库查询失败！'});
+            });
+        }
+    });
+});
+
+/**
+ * 更新消息模板目录的请求
+ */
+app.post('/updateSysMsgTemplateDir', bodyParser.json(), (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: 'token令牌已过期，请重新登录'});
+        } else {
+            const {uid, templates} = req.body;
+            updateTemplateList(uid, templates).then(() => {
+                res.status(Code.success).send({code: Code.success, msg: '消息模板目录更新成功！'});
+            }).catch(err => {
+                res.status(Code.error).send({code: Code.error, msg: '消息模板目录更新失败！'});
+                logger.error(`用户${uid}消息目录更新失败：`, err);
+            });
+        }
+    });
+});
