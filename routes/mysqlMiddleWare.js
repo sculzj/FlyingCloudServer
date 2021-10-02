@@ -3,15 +3,13 @@
  */
 const mysql = require('mysql');
 const MD5 = require("MD5");
-const {Code, INFO} = require("./constants");
+const {INFO} = require("./constants");
 const {Status} = require("./constants");
 const moment = require('moment');
 const {nanoid} = require("nanoid");
-const {resolve} = require("path");
 
 /**
  * 引入自定义日志模块
- * @type {Logger}
  */
 const logger = require('./log-component').logger;
 
@@ -27,7 +25,7 @@ const conMap = new Map();
  */
 
 const baseParams = {
-    host: '192.168.101.3',
+    host: '127.0.0.1',
     port: '3306',
     user: 'root',
     password: '17xy8qzb',
@@ -92,7 +90,6 @@ const queryProductInfoSql = 'select * from product_info';
 const queryRank = 'select * from topic order by discuss DESC limit 10';
 const queryOrgSql = 'select * from companies where code=?';
 const verifyOrgEmailSql = 'select * from companies where email=?';
-const searchOrgByEmail = 'select * from companies where email=?';
 
 /**
  * 普通用户登录校验
@@ -277,7 +274,7 @@ function verifyIdentity(identity) {
 function getOrgsInfo(identity) {
     return new Promise((resolve, reject) => {
         setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
-        conMap.get(identity).query('select * from organizations order by tier DESC,sequence ASC', (err, result) => {
+        conMap.get(identity).query('select * from organizations order by tier DESC,sequence', (err, result) => {
             if (err) {
                 reject(INFO.DATABASE_QUERY_ERR);
                 logger.error(err);
@@ -318,10 +315,10 @@ function updateOrgsInfo(identity, data) {
     return new Promise(async (resolve, reject) => {
         const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
         const con = conMap.get(identity);
-       if (data.length === 1 && !data[0].newCode) {
+        if (data.length === 1 && !data[0].newCode) {
             con.query('update organizations set name = ?,garden=?,building=?,room=? where code =?', [data[0].name,
                 data[0].garden, data[0].building, data[0].room, data[0].code], (err) => {
-                if ('0:', err) {
+                if (err) {
                     console.log(err);
                     logger.error(err);
                     reject(INFO.DATABASE_QUERY_ERR);
@@ -397,7 +394,7 @@ function updateOrgsMembers(connection) {
  * @param code 节点代码
  * @returns {*}
  */
-function deleteGroup(identity, code) {
+function deleteOrg(identity, code) {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
         conMap.get(identity).query('delete from organizations where code=?', [code], (err) => {
@@ -411,72 +408,6 @@ function deleteGroup(identity, code) {
     });
 }
 
-/**
- * 删除节点后通过递归函数更新组织信息及关系
- * @param oldParent 要操作的组织机构父节点代码
- * @param newParent 要更新的组织结构父节点代码
- * @param rankIndex 标定删除节点的顺序值，只有被删除节点的兄弟节点需要更新顺序值
- * @param sql1 mySql查找执行语句
- * @param sql2 mySql更新执行语句
- * @param reject 期约兑换失败的方法
- */
-
-async function recurseUpdateGroupInfo(oldParent, newParent, rankIndex, sql1, sql2, reject) {
-    await defaultConnection.query(sql1, [oldParent], async (err, result) => {
-        if (err)
-            reject('数据库异常，查询失败！');
-        if (result.length > 0) {
-            for (let i = 0; i < result.length; i++) {
-                let str = (i + 1).toString();
-                switch (str.length) {
-                    case 1:
-                        str = '00' + str;
-                        break;
-                    case 2:
-                        str = '0' + str;
-                        break;
-                    default:
-                        break;
-                }
-                const newCode = newParent.concat(str);
-                // console.log('标定顺序值：'+rankIndex);
-                // console.log('原顺序值：'+result[i].rankIndex);
-                const newIndex = result[i].rankIndex > rankIndex ? result[i].rankIndex - 1 : result[i].rankIndex;
-                // console.log('新的顺序值：'+newIndex);
-                await defaultConnection.query(sql2, [newCode, newParent, newIndex, result[i].groupCode], async (err1) => {
-                    if (err1)
-                        reject('数据库异常，操作失败！');
-                    else {
-                        await recurseUpdateGroupInfo(result[i].groupCode, newCode, 99, sql1, sql2, reject);
-                    }
-                });
-            }
-        }
-    });
-}
-
-async function updateRankIndex(orgEmail, indexInfo) {
-    let command = '';
-    const inIndex = [];
-    indexInfo.forEach(item => {
-        command += `when ${item.groupCode} then ${item.rankIndex} `;
-        inIndex.push(item.groupCode);
-    });
-    await defaultConnection.query(searchOrgByEmail, [orgEmail], async (err, result) => {
-        if (err)
-            console.log('数据库异常，查询失败！');
-        if (result.length === 0)
-            console.log('未查找到企业组织信息！');
-        if (result.length === 1) {
-            await defaultConnection.query(`update org_group_${result[0].orgCode.toLocaleLowerCase()}
-                                           SET rankIndex=case groupCode ${command} end
-                                           where groupCode in (${inIndex.join()})`, [], (err1) => {
-                if (err1)
-                    console.log('数据库异常，查询失败！');
-            });
-        }
-    });
-}
 
 /**
  * 注册成功后调用的函数，根据企业信息创建数据库表，完成初始化
@@ -615,7 +546,7 @@ function initCompanyResource(company) {
                                                 reject('企业资源初始化失败，请联系管理员！');
                                             } else {
                                                 // noinspection SqlResolve
-                                                theCon.query('insert into organizations values (?,?,?,?,?,?,?)', ['001', '根节点', 0, 1, '', '', 1], err4 => {
+                                                theCon.query('insert into organizations values (?,?,?,?,?,?,?,?,?,?)', ['001', '根节点', 0, 1, '', '', 1, '', '', ''], err4 => {
                                                     if (err4) {
                                                         console.log('企业组织表初始化失败，请联系管理员！', err4);
                                                         reject('企业资源初始化失败，请联系管理员！');
@@ -1023,6 +954,41 @@ function updateTemplateList(uid, templates) {
     });
 }
 
+/**
+ * 获取所有付费产品信息
+ */
+function getPayingProductInfo() {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
+        conMap.get('base').query('select * from product where type = 1',(err,result)=>{
+            if (err){
+                reject(INFO.DATABASE_QUERY_ERR);
+            }else {
+                resolve(result);
+            }
+            clearTimeout(timer);
+        });
+    });
+}
+
+/**
+ * 获取企业购物车内的产品信息
+ * @param identity
+ */
+function getShoppingProduct(identity) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
+        conMap.get(identity).query('select * from product where state = 0',(err,result)=>{
+            if (err){
+                reject(INFO.DATABASE_QUERY_ERR);
+            }else {
+                resolve(result);
+            }
+            clearTimeout(timer);
+        });
+    });
+}
+
 module.exports = {
     userToLogin,
     adminToLogin,
@@ -1036,8 +1002,7 @@ module.exports = {
     verifyOrg,
     getOrgsInfo,
     insertOrgInfo,
-    deleteGroup,
-    updateRankIndex,
+    deleteOrg,
     initCompanyResource,
     verifyIdentity,
     verifySysUser,
@@ -1057,5 +1022,7 @@ module.exports = {
     exportCompaniesInfo,
     getTemplateList,
     updateTemplateList,
-    updateOrgsInfo
+    updateOrgsInfo,
+    getPayingProductInfo,
+    getShoppingProduct
 };
