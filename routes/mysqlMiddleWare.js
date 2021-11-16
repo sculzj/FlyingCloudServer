@@ -7,6 +7,7 @@ const {INFO} = require("./constants");
 const {Status} = require("./constants");
 const moment = require('moment');
 const {nanoid} = require("nanoid");
+const {resolve} = require("path");
 
 /**
  * 引入自定义日志模块
@@ -25,7 +26,7 @@ const conMap = new Map();
  */
 
 const baseParams = {
-    host: '127.0.0.1',
+    host: '192.168.101.3',
     port: '3306',
     user: 'root',
     password: '17xy8qzb',
@@ -83,9 +84,7 @@ defaultConnection.connect(err => {
     });
 });
 
-// const verifyUserSql = 'select * from users where userId=? and pwd=?';
 const verifyOrgSql = 'select * from companies where email=? and pwd=?';
-// const queryUserInfoSql = 'select * from userinfo where userId=?';
 const queryProductInfoSql = 'select * from product_info';
 const queryRank = 'select * from topic order by discuss DESC limit 10';
 const queryOrgSql = 'select * from companies where code=?';
@@ -960,10 +959,10 @@ function updateTemplateList(uid, templates) {
 function getPayingProductInfo() {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
-        conMap.get('base').query('select * from product where type = 1',(err,result)=>{
-            if (err){
+        conMap.get('base').query('select * from product where type = 1', (err, result) => {
+            if (err) {
                 reject(INFO.DATABASE_QUERY_ERR);
-            }else {
+            } else {
                 resolve(result);
             }
             clearTimeout(timer);
@@ -978,11 +977,214 @@ function getPayingProductInfo() {
 function getShoppingProduct(identity) {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
-        conMap.get(identity).query('select * from product where state = 0',(err,result)=>{
-            if (err){
+        conMap.get(identity).query('select * from product where state = 0', (err, result) => {
+            if (err) {
                 reject(INFO.DATABASE_QUERY_ERR);
-            }else {
+            } else {
                 resolve(result);
+            }
+            clearTimeout(timer);
+        });
+    });
+}
+
+/**
+ * 查询工号
+ * @param identity 企业标识
+ * @param jobNum 工号
+ * @returns {*} 查询结果
+ */
+function getJobNum(identity, jobNum) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
+        conMap.get(identity).query('select jobNum from users where jobNum = ?', [jobNum], (err, result) => {
+            if (err) {
+                reject(INFO.DATABASE_QUERY_ERR);
+            } else {
+                resolve(result);
+            }
+            clearTimeout(timer);
+        });
+    });
+}
+
+/**
+ * 查询账号
+ * @param identity 企业标识
+ * @param uid 账号
+ * @return {*} 查询结果
+ */
+function getUid(identity, uid) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
+        conMap.get(identity).query('select uid from users where uid = ?', [uid], (err, result) => {
+            if (err) {
+                reject(INFO.DATABASE_QUERY_ERR);
+            } else {
+                resolve(result);
+            }
+            clearTimeout(timer);
+        });
+    });
+}
+
+/**
+ * 查询用户姓名
+ * @param identity 企业标识
+ * @param name 用户姓名
+ * @return {*} 查询结果
+ */
+function getUserName(identity, name) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
+        conMap.get(identity).query('select name from users where name = ?', [name], (err, result) => {
+            if (err) {
+                reject(INFO.DATABASE_QUERY_ERR);
+            } else {
+                resolve(result);
+            }
+            clearTimeout(timer);
+        });
+    });
+}
+
+/**
+ * 查询公共权限列表
+ * @return {*} 结果集合
+ */
+function getCommonPermission() {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
+        conMap.get('base').query('select * from permission', (err, result) => {
+            if (err) {
+                reject(INFO.DATABASE_QUERY_ERR);
+            } else {
+                resolve(result);
+            }
+            clearTimeout(timer);
+        });
+    });
+}
+
+/**
+ * 创建角色
+ * @param identity 企业标识
+ * @param name 角色名称
+ * @param level 角色等级
+ * @param permission 角色权限
+ * @param cloud_storage 云盘空间
+ * @return {*}
+ */
+function createRole(identity, name, level, permission, cloud_storage) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
+        conMap.get(identity).query('insert into roles values (?,?,?,?)', [name, level, permission, cloud_storage], (err) => {
+            if (err) {
+                reject(INFO.DATABASE_QUERY_ERR);
+            } else {
+                resolve(INFO.DATABASE_QUERY_SUCCESS);
+            }
+            clearTimeout(timer);
+        });
+    });
+}
+
+/**
+ * 获取角色信息
+ * @param identity
+ */
+function getRolesInfo(identity) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
+        conMap.get(identity).query('select * from roles order by level asc', (err, result) => {
+            if (err) {
+                reject(INFO.DATABASE_QUERY_ERR);
+            } else {
+                resolve(result);
+            }
+            clearTimeout(timer);
+        });
+    });
+}
+
+/**
+ * 更新角色信息
+ * @param identity 企业标识
+ * @param name 角色名称
+ * @param level 角色等级
+ * @param permission 权限
+ * @param cloud_storage 企业云盘
+ */
+function updateRoleInfo(identity, name, level, permission, cloud_storage) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
+        conMap.get(identity).query('update roles set name=?,level=?,permission=?,cloud_storage=? where name=?', [name, level, permission, cloud_storage, name], (err) => {
+            if (err) {
+                reject(INFO.DATABASE_QUERY_ERR);
+            } else {
+                resolve(INFO.DATABASE_QUERY_SUCCESS);
+            }
+            clearTimeout(timer);
+        });
+    });
+}
+
+/**
+ * 删除角色信息
+ * @param identity 企业标识
+ * @param name 角色名称
+ */
+function deleteRoleInfo(identity, name) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
+        conMap.get(identity).query('delete from roles where name=?', [name], (err) => {
+            if (err) {
+                reject(INFO.DATABASE_QUERY_ERR);
+            } else {
+                resolve(INFO.DATABASE_QUERY_SUCCESS);
+            }
+            clearTimeout(timer);
+        });
+    });
+}
+
+/**
+ * 根据关键字模糊搜索用户，限定20个结果
+ * @param identity 企业标识
+ * @param key 模糊搜索关键字
+ */
+function getCandidateUsers(identity, key) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
+        conMap.get(identity).query(`select name
+                                    from users
+                                    where uid like '%${key}%'
+                                       or name like '%${key}%'
+                                    limit 20`, [key, key], (err, result) => {
+            if (err) {
+                reject(INFO.DATABASE_QUERY_ERR);
+            } else {
+                resolve(result);
+            }
+            clearTimeout(timer);
+        });
+    });
+}
+
+/**
+ * 新建用户
+ * @param identity 企业标识
+ * @param info 用户信息数组
+ */
+function createUser(identity, info) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(reject, 15000, INFO.DATABASE_CONNECT_OVERTIME);
+        conMap.get(identity).query('insert into users (uid,jobNum,name,sex,phone,shortPhone,email,orgCode,orgName,post,leader) values (?,?,?,?,?,?,?,?,?,?,?)',info,err=>{
+            if (err) {
+                console.log(err);
+                reject(INFO.DATABASE_QUERY_ERR);
+            } else {
+                resolve(INFO.DATABASE_QUERY_SUCCESS);
             }
             clearTimeout(timer);
         });
@@ -1024,5 +1226,15 @@ module.exports = {
     updateTemplateList,
     updateOrgsInfo,
     getPayingProductInfo,
-    getShoppingProduct
+    getShoppingProduct,
+    getJobNum,
+    getUid,
+    getUserName,
+    getCommonPermission,
+    createRole,
+    getRolesInfo,
+    updateRoleInfo,
+    deleteRoleInfo,
+    getCandidateUsers,
+    createUser
 };

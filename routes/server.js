@@ -18,15 +18,11 @@ const logger = require('./log-component').logger;
 const privateKey = fs.readFileSync('../key/private.key');
 const {Status, Code, serverIP, INFO} = require('./constants');
 const {
-    getProductInfo,
     getRank,
     getUserInfo,
-    verifyOrgCode,
     registerOrg,
-    verifyOrgEmail,
     deleteOrg,
     initCompanyResource,
-    verifyIdentity,
     verifySysUser,
     getQuestions,
     initSysPwd,
@@ -44,7 +40,8 @@ const {
     exportCompaniesInfo,
     getTemplateList,
     updateTemplateList, userToLogin, adminToLogin, getOrgsInfo, insertOrgInfo, updateOrgsInfo, getPayingProductInfo,
-    getShoppingProduct
+    getShoppingProduct, getJobNum, getUid, getUserName, getCommonPermission, createRole, getRolesInfo, updateRoleInfo,
+    deleteRoleInfo, getCandidateUsers, createUser
 } = require('./mysqlMiddleWare');
 // const {verifyUserLogin,getProductInfo} = require('./redisMiddleWare');
 
@@ -256,7 +253,7 @@ app.post('/upload', (req, res) => {
 /**
  * 获取企业组织信息
  */
-app.post('/orgsInfo', (req, res) => {
+app.get('/orgsInfo', (req, res) => {
     const token = req.headers.authorization;
     jwt.verify(token, privateKey, (err, decoded) => {
         if (err) {
@@ -740,26 +737,227 @@ app.post('/updateSysMsgTemplateDir', bodyParser.json(), (req, res) => {
 /**
  * 获取产品商城内增值产品以及购物车、促销等信息的接口
  */
-app.get('/productInfo',(req, res) => {
-    const token=req.headers.authorization;
-    jwt.verify(token,privateKey,(err,decode)=>{
-        if (err){
-            res.status(Code.refused).send({code:Code.refused,msg:INFO.TOKEN_DATE_OUT});
-        }else {
-            const data={code:Code.success};
-            getPayingProductInfo().then(result=>{
-                data.product=result;
-                getShoppingProduct(decode.data.identity).then(result1=>{
-                    data.shopping=result1;
+app.get('/productInfo', (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err, decode) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: INFO.TOKEN_DATE_OUT});
+        } else {
+            const data = {code: Code.success};
+            getPayingProductInfo().then(result => {
+                data.product = result;
+                getShoppingProduct(decode.data.identity).then(result1 => {
+                    data.shopping = result1;
                     res.status(Code.success).send(data);
-                }).catch(err1=>{
+                }).catch(err1 => {
                     console.log(err1);
-                    res.status(Code.error).send({code:Code.error,msg:INFO.DATABASE_QUERY_ERR});
+                    res.status(Code.error).send({code: Code.error, msg: INFO.DATABASE_QUERY_ERR});
                 });
-            }).catch(err=>{
+            }).catch(err => {
                 console.log(err);
+                res.status(Code.error).send({code: Code.error, msg: INFO.DATABASE_QUERY_ERR});
+            });
+        }
+    });
+});
+
+/**
+ * 查询工号的接口
+ */
+app.get('/jobNum', (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err, decode) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: INFO.TOKEN_DATE_OUT});
+        } else {
+            const {jobNum} = req.query;
+            getJobNum(decode.data.identity, jobNum).then(result => {
+                res.status(Code.success).send({code: Code.success, jobNum: result});
+            }).catch(err => {
+                logger.error(err);
+                res.status(Code.error).send({code: Code.error, msg: INFO.DATABASE_QUERY_ERR});
+            });
+        }
+    });
+});
+
+/**
+ * 查询账号的接口
+ */
+app.get('/uid', (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err, decode) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: INFO.TOKEN_DATE_OUT});
+        } else {
+            const {uid} = req.query;
+            getUid(decode.data.identity, uid).then(result => {
+                res.status(Code.success).send({code: Code.success, uid: result});
+            }).catch(err => {
+                logger.error(err);
+                res.status(Code.error).send({code: Code.error, msg: INFO.DATABASE_QUERY_ERR});
+            });
+        }
+    });
+});
+
+/**
+ * 查询用户姓名的接口
+ */
+app.get('/userName', (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err, decode) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: INFO.TOKEN_DATE_OUT});
+        } else {
+            const {name} = req.query;
+            getUserName(decode.data.identity, name).then(result => {
+                res.status(Code.success).send({code: Code.success, name: result});
+            }).catch(err => {
+                logger.error(err);
+                res.status(Code.error).send({code: Code.error, msg: INFO.DATABASE_QUERY_ERR});
+            });
+        }
+    });
+});
+
+/**
+ * 获取公共权限列表的接口
+ */
+app.get('/permission', (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: INFO.TOKEN_DATE_OUT});
+        } else {
+            getCommonPermission().then(result => {
+                res.status(Code.success).send({code: Code.success, result: result});
+            }).catch(err => {
+                logger.error(err);
+                res.status(Code.error).send({code: Code.error, msg: INFO.DATABASE_QUERY_ERR});
+            });
+        }
+    });
+});
+
+/**
+ * 创建角色的接口
+ */
+app.post('/role', bodyParser.json(), (req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err, decode) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: INFO.TOKEN_DATE_OUT});
+        } else {
+            const {name, level, permission, cloud_storage} = req.body;
+            createRole(decode.data.identity, name, level, permission, cloud_storage).then(() => {
+                    res.status(Code.success).send({code: Code.success, msg: INFO.DATABASE_QUERY_SUCCESS});
+                }
+            ).catch(err=>{
+                logger.error(err);
+                res.status(Code.error).send({code: Code.error, msg: INFO.DATABASE_QUERY_ERR});
+            });
+        }
+    });
+});
+
+/**
+ * 获取角色的接口
+ */
+app.get('/role',(req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err, decode) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: INFO.TOKEN_DATE_OUT});
+        } else {
+            getRolesInfo(decode.data.identity).then(result=>{
+                res.status(Code.success).send({code:Code.success,roles:result});
+            }).catch(err=>{
+                logger.error(err);
                 res.status(Code.error).send({code:Code.error,msg:INFO.DATABASE_QUERY_ERR});
             });
         }
     });
 });
+
+/**
+ * 修改角色的接口
+ */
+app.put('/role',bodyParser.json(),(req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err, decode) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: INFO.TOKEN_DATE_OUT});
+        } else {
+            const {name, level, permission, cloud_storage} = req.body;
+            updateRoleInfo(decode.data.identity,name, level, permission, cloud_storage).then(()=>{
+                res.status(Code.success).send({code:Code.success,msg:INFO.DATABASE_QUERY_SUCCESS});
+            }).catch(err=>{
+                logger.error(err);
+                res.status(Code.error).send({code:Code.error,msg:INFO.DATABASE_QUERY_ERR});
+            });
+        }
+    });
+});
+
+/**
+ * 删除角色的接口
+ */
+app.delete('/role',bodyParser.json(),(req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err, decode) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: INFO.TOKEN_DATE_OUT});
+        } else {
+            const {name} = req.body;
+            deleteRoleInfo(decode.data.identity,name).then(()=>{
+                res.status(Code.success).send({code:Code.success,msg:INFO.DATABASE_QUERY_SUCCESS});
+            }).catch(err=>{
+                logger.error(err);
+                res.status(Code.error).send({code:Code.error,msg:INFO.DATABASE_QUERY_ERR});
+            });
+        }
+    });
+});
+
+/**
+ * 通过模糊查询获取候选用户列表
+ */
+app.get('/candidate',(req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err, decode) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: INFO.TOKEN_DATE_OUT});
+        } else {
+            // console.log(req.query);
+            getCandidateUsers(decode.data.identity,req.query.key).then(result=>{
+                res.status(Code.success).send({code:Code.success,users:result});
+            }).catch(err=>{
+                logger.error(err);
+                res.status(Code.error).send({code:Code.error,msg:INFO.DATABASE_QUERY_ERR});
+            });
+        }
+    });
+});
+
+/**
+ * 创建企业成员的接口
+ */
+app.post('/user',bodyParser.json(),(req, res) => {
+    const token = req.headers.authorization;
+    jwt.verify(token, privateKey, (err, decode) => {
+        if (err) {
+            res.status(Code.refused).send({code: Code.refused, msg: INFO.TOKEN_DATE_OUT});
+        } else {
+            const {uid,jobNum,name,sex,phone,shortPhone,email,orgCode,orgName,post,leader}=req.body;
+            createUser(decode.data.identity,[uid,jobNum,name,sex,phone,shortPhone,email,orgCode,orgName,post,leader]).then(()=>{
+                res.status(Code.success).send({code:Code.success,msg:INFO.DATABASE_QUERY_SUCCESS});
+            }).catch(err=>{
+                logger.error(err);
+                // console.log(err);
+                res.status(Code.error).send({code:Code.error,msg:INFO.DATABASE_QUERY_ERR});
+            });
+        }
+    });
+});
+
